@@ -91,13 +91,26 @@ export function statusColor(s: Status): string {
 export function statusBg(s: Status): string {
   switch (s) {
     case "ahead":
-      return "bg-ok/15 text-ok border-ok/30";
+      return "border-ok/60 bg-ok/15 text-ok";
     case "on_track":
-      return "bg-ok/10 text-ok border-ok/25";
+      return "border-ok/40 bg-ok/10 text-ok";
     case "at_risk":
-      return "bg-warn/15 text-warn border-warn/30";
+      return "border-warn/60 bg-warn/15 text-warn";
     case "off_track":
-      return "bg-bad/15 text-bad border-bad/30";
+      return "border-bad/60 bg-bad/15 text-bad";
+  }
+}
+
+/** Solid (flat) status color — no gradients. */
+export function statusSolid(s: Status): string {
+  switch (s) {
+    case "ahead":
+    case "on_track":
+      return "#48f088";
+    case "at_risk":
+      return "#f8c808";
+    case "off_track":
+      return "#e83028";
   }
 }
 

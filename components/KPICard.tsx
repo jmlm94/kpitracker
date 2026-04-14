@@ -12,9 +12,10 @@ import {
   progressRatio,
   statusBg,
   statusLabel,
+  statusSolid,
 } from "@/lib/format";
 import { Avatar } from "./Avatar";
-import { ArrowUpRight, TrendingDown, TrendingUp } from "lucide-react";
+import { TrendingDown, TrendingUp } from "lucide-react";
 
 export function KPICard({
   kpi,
@@ -33,54 +34,59 @@ export function KPICard({
   const ratio = progress ? progressRatio(kpi, target, actual) : 0;
   const status = classifyStatus(ratio);
   const pct = Math.min(120, Math.round(ratio * 100));
+  const statusColor = statusSolid(status);
 
   const todayValue = progress?.today ?? 0;
-  const todayRatio = progress
-    ? progressRatio(kpi, target, todayValue)
-    : 0;
   const todayBetter =
     kpi.direction === "higher_is_better"
       ? todayValue >= actual
       : todayValue <= actual;
 
-  const color = deptColor || "#ff6a3d";
+  const accent = deptColor || "#f8c808";
+  const windowLabel =
+    kpi.window === "today"
+      ? "Today"
+      : kpi.window === "7d"
+        ? "Last 7 Days"
+        : kpi.window === "30d"
+          ? "Last 30 Days"
+          : "Month-to-Date";
 
   return (
-    <div className="card card-hover group relative overflow-hidden p-5">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 opacity-80"
-        style={{
-          background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
-        }}
-      />
+    <div className="card card-hover group relative p-5">
+      {/* Top rail — solid accent color, no gradient */}
+      <div aria-hidden className="absolute inset-x-0 top-0 h-[2px]" style={{ background: accent }} />
+
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-wider text-white/40">
-            {kpi.window === "today" ? "Today" : kpi.window === "7d" ? "Last 7 days" : "Month-to-date"}
-          </div>
-          <h3 className="mt-1 font-display text-base font-semibold text-white">
+        <div className="min-w-0">
+          <div className="bracket">{windowLabel}</div>
+          <h3 className="mt-1 font-heading text-[15px] font-semibold uppercase tracking-brand text-white">
             {kpi.name}
           </h3>
           {kpi.description && (
-            <p className="mt-1 text-xs text-white/50 line-clamp-2">{kpi.description}</p>
+            <p className="mt-1 text-[11px] leading-snug text-white/50 line-clamp-2">
+              {kpi.description}
+            </p>
           )}
         </div>
         <span className={cx("chip shrink-0", statusBg(status))}>
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          <span className="h-1.5 w-1.5 bg-current" />
           {statusLabel(status)}
         </span>
       </div>
 
       <div className="mt-5 flex items-end justify-between gap-4">
         <div>
-          <div className="font-display text-3xl font-semibold tracking-tight text-white">
+          <div className="font-numeric text-[38px] font-bold leading-none tracking-tight text-white">
             {formatValue(actual, kpi.unit)}
           </div>
-          <div className="mt-1 text-xs text-white/50">
-            Target {formatValueFull(target.target, kpi.unit)}
-            <span className="mx-1.5 text-white/20">·</span>
-            {pct}% of goal
+          <div className="mt-2 flex items-center gap-1.5 font-heading text-[10px] uppercase tracking-brand text-white/50">
+            <span className="text-white/40">Target</span>
+            <span className="text-white">{formatValueFull(target.target, kpi.unit)}</span>
+            <span className="text-white/30">·</span>
+            <span style={{ color: statusColor }} className="font-semibold">
+              {pct}% of goal
+            </span>
           </div>
         </div>
         <div className="h-14 w-32">
@@ -92,14 +98,14 @@ export function KPICard({
               >
                 <defs>
                   <linearGradient id={`g-${kpi.id}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity={0.45} />
-                    <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+                    <stop offset="0%" stopColor={accent} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={accent} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke={color}
+                  stroke={accent}
                   strokeWidth={1.5}
                   fill={`url(#g-${kpi.id})`}
                   dot={false}
@@ -116,17 +122,13 @@ export function KPICard({
         </div>
       </div>
 
-      <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+      {/* Progress bar — flat fill, no gradient */}
+      <div className="mt-4 h-1.5 w-full overflow-hidden border border-white/5 bg-white/[0.03]">
         <div
-          className="h-full rounded-full transition-[width] duration-700"
+          className="h-full transition-[width] duration-700"
           style={{
             width: `${Math.min(100, pct)}%`,
-            background:
-              status === "off_track"
-                ? "linear-gradient(90deg, #f87171, #ef4444)"
-                : status === "at_risk"
-                  ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
-                  : `linear-gradient(90deg, ${color}, #34d399)`,
+            background: statusColor,
           }}
         />
       </div>
@@ -135,34 +137,28 @@ export function KPICard({
         {owner ? (
           <Link
             href={`/team/${owner.id}`}
-            className="flex items-center gap-2 text-sm text-white/80 hover:text-white"
+            className="flex items-center gap-2.5 text-sm text-white/85 hover:text-white"
           >
-            <Avatar name={owner.name} size={26} color={color} />
+            <Avatar name={owner.name} size={28} color={accent} />
             <div className="leading-tight">
-              <div className="text-[13px] font-medium">{owner.name}</div>
-              <div className="text-[11px] text-white/40">{owner.position}</div>
+              <div className="font-heading text-[12px] font-semibold uppercase tracking-brand">
+                {owner.name}
+              </div>
+              <div className="text-[10px] text-white/45">{owner.position}</div>
             </div>
           </Link>
         ) : (
           <span className="text-xs text-white/40">Unassigned</span>
         )}
-        <div className="flex items-center gap-1 text-[11px] text-white/50">
+        <div className="flex items-center gap-1 font-numeric text-[10px] uppercase tracking-brand text-white/55">
           {todayBetter ? (
             <TrendingUp size={12} className="text-ok" />
           ) : (
             <TrendingDown size={12} className="text-bad" />
           )}
-          Today: {formatValue(todayValue, kpi.unit)}
-          <span className="muted">({Math.round(todayRatio * 100)}%)</span>
+          Today {formatValue(todayValue, kpi.unit)}
         </div>
       </div>
-
-      <Link
-        href={`/kpis#${target.id}`}
-        className="absolute right-4 top-4 opacity-0 transition group-hover:opacity-100"
-      >
-        <ArrowUpRight size={14} className="text-white/60" />
-      </Link>
     </div>
   );
 }

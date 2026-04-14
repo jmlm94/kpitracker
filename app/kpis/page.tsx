@@ -20,9 +20,10 @@ export default function KPIsPage() {
     <div>
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="section-title">KPIs & Targets</h1>
-          <p className="text-sm text-white/50">
-            Manage every tracked metric. To add a new one, use the onboarding wizard.
+          <div className="bracket">04 — Scoreboard</div>
+          <h1 className="section-title mt-1">KPIs & Targets</h1>
+          <p className="mt-2 text-sm text-white/50">
+            Every tracked metric. To add a new one, use the onboarding wizard.
           </p>
         </div>
         <Link href="/onboarding" className="btn-primary">

@@ -27,7 +27,7 @@ export function Topbar() {
       setFlash(true);
       setTimeout(() => setFlash(false), 1800);
     } catch {
-      // swallow — the UI keeps existing data
+      // swallow
     } finally {
       setRunning(false);
     }
@@ -38,30 +38,30 @@ export function Topbar() {
     undefined,
   );
 
+  const month = new Date().toLocaleString("en-US", { month: "long", year: "numeric" });
+
   return (
-    <header className="sticky top-0 z-20 border-b border-white/5 bg-ink-950/70 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-white/10 bg-jet-950/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">
-            Command Center
-          </div>
-          <div className="font-display text-lg font-semibold tracking-tight text-white">
-            Company KPIs — April 2026
+          <div className="bracket">Command Center</div>
+          <div className="mt-1 font-display text-2xl font-extrabold uppercase leading-none tracking-brand text-white">
+            Company KPIs — <span className="text-carbinox">{month}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
           {lastUpdated && (
-            <span className="hidden text-xs text-white/50 md:inline">
+            <span className="hidden font-numeric text-[11px] uppercase tracking-brand text-white/50 md:inline">
               Last sync · {new Date(lastUpdated).toLocaleString()}
             </span>
           )}
           <button
             onClick={refresh}
             disabled={running}
-            className="btn-ghost disabled:opacity-50"
+            className="btn-primary disabled:opacity-50"
           >
             {flash ? (
-              <CheckCircle2 size={14} className="text-ok" />
+              <CheckCircle2 size={14} />
             ) : (
               <RefreshCw size={14} className={running ? "animate-spin" : ""} />
             )}

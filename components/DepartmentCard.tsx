@@ -9,6 +9,7 @@ import {
   progressRatio,
   statusBg,
   statusLabel,
+  statusSolid,
 } from "@/lib/format";
 
 export function DepartmentCard({
@@ -41,76 +42,70 @@ export function DepartmentCard({
 
   const avg = deptTargets.length ? sum / deptTargets.length : 0;
   const status = classifyStatus(avg);
+  const fillColor = statusSolid(status);
 
   return (
     <Link
       href={`/departments/${department.id}`}
-      className="card card-hover group relative block overflow-hidden p-5"
+      className="card card-hover group relative block p-5"
     >
       <div
         aria-hidden
-        className="absolute -right-10 -top-10 h-32 w-32 rounded-full opacity-20 blur-2xl"
+        className="absolute inset-x-0 top-0 h-[2px]"
         style={{ background: department.color }}
       />
+
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div
-            className="inline-block h-1 w-8 rounded-full"
-            style={{ background: department.color }}
-          />
-          <h3 className="mt-2 font-display text-lg font-semibold text-white">
+          <div className="bracket">{department.name}</div>
+          <h3 className="mt-2 font-display text-3xl font-extrabold uppercase leading-none tracking-brand text-white">
             {department.name}
           </h3>
-          <div className="text-xs text-white/50">
+          <div className="mt-1.5 font-numeric text-[11px] uppercase tracking-brand text-white/55">
             {members.length} {members.length === 1 ? "person" : "people"} ·{" "}
             {deptTargets.length} KPI{deptTargets.length === 1 ? "" : "s"}
           </div>
         </div>
         <span className={cx("chip", statusBg(status))}>
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          <span className="h-1.5 w-1.5 bg-current" />
           {statusLabel(status)}
         </span>
       </div>
 
       <div className="mt-5">
-        <div className="flex items-center justify-between text-xs text-white/50">
-          <span>Overall progress</span>
-          <span className="text-white/80">{Math.round(avg * 100)}%</span>
+        <div className="flex items-center justify-between font-heading text-[10px] uppercase tracking-brand text-white/50">
+          <span>Overall Progress</span>
+          <span className="font-numeric text-white">{Math.round(avg * 100)}%</span>
         </div>
-        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/5">
+        <div className="mt-2 h-2 w-full border border-white/5 bg-white/[0.03]">
           <div
-            className="h-full rounded-full transition-all"
+            className="h-full"
             style={{
               width: `${Math.min(100, avg * 100)}%`,
-              background: `linear-gradient(90deg, ${department.color}, #34d399)`,
+              background: fillColor,
             }}
           />
         </div>
       </div>
 
       <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-        <Stat label="On track" value={ok} tone="ok" />
-        <Stat label="At risk" value={risk} tone="warn" />
-        <Stat label="Off track" value={off} tone="bad" />
+        <Stat label="On track" value={ok} color="#48f088" />
+        <Stat label="At risk" value={risk} color="#f8c808" />
+        <Stat label="Off track" value={off} color="#e83028" />
       </div>
     </Link>
   );
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "ok" | "warn" | "bad";
-}) {
-  const color = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : "text-bad";
+function Stat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="rounded-lg border border-white/5 bg-white/[0.02] py-2">
-      <div className={cx("font-display text-lg font-semibold", color)}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-white/40">{label}</div>
+    <div className="border border-white/5 bg-white/[0.02] py-2">
+      <div className="font-numeric text-xl font-bold" style={{ color }}>
+        {value}
+      </div>
+      <div className="font-heading text-[9px] font-semibold uppercase tracking-brand text-white/45">
+        {label}
+      </div>
     </div>
   );
 }

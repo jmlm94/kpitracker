@@ -2,29 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Morganite:wght@600;700;800;900&family=Archivo+Narrow:wght@500;600;700&family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
 
 :root {
   color-scheme: dark;
+  --grain-url: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.06 0 0 0 0 0.06 0 0 0 0 0.06 0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
 }
 
 html,
 body {
-  background: #07090d;
-  color: #e6e8ec;
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #050505;
+  color: #f8f8f8;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 body {
+  background-color: #050505;
   background-image:
-    radial-gradient(1200px circle at 0% -20%, rgba(255, 106, 61, 0.12), transparent 45%),
-    radial-gradient(900px circle at 100% 0%, rgba(59, 130, 246, 0.08), transparent 40%),
-    linear-gradient(180deg, #07090d 0%, #060709 100%);
+    var(--grain-url),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='110' viewBox='0 0 96 110'><g fill='none' stroke='%23ffffff' stroke-opacity='0.035' stroke-width='1'><polygon points='24,3 72,3 93,27 93,83 72,107 24,107 3,83 3,27'/><path d='M24 3 L72 107 M72 3 L24 107'/></g></svg>");
+  background-repeat: repeat;
   min-height: 100vh;
 }
 
-/* scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -33,62 +34,113 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1c2230;
-  border-radius: 999px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 0;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2a3244;
+  background: #262626;
+}
+
+/* selection */
+::selection {
+  background: #f8c808;
+  color: #050505;
 }
 
 @layer components {
+  /* Hard-edged industrial card — no rounded corners, thin white hairline */
   .card {
-    @apply rounded-2xl border border-white/5 bg-ink-800/60 backdrop-blur-sm shadow-card;
+    @apply relative border border-white/10 bg-jet-900 shadow-card;
   }
   .card-hover {
-    @apply transition hover:border-white/10 hover:bg-ink-800/80;
+    @apply transition hover:border-carbinox/50 hover:bg-jet-800;
   }
+  /* CTA buttons */
   .btn {
-    @apply inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition;
+    @apply inline-flex items-center gap-2 px-4 py-2.5 text-[12px] font-heading font-semibold uppercase tracking-brand transition;
   }
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-accent-soft shadow-glow;
+    @apply btn bg-carbinox text-jet-950 hover:bg-carbinox-light;
   }
   .btn-ghost {
-    @apply btn border border-white/10 bg-white/[0.02] text-white/80 hover:bg-white/[0.06] hover:text-white;
+    @apply btn border border-white/15 bg-transparent text-white hover:border-carbinox hover:text-carbinox;
   }
   .btn-danger {
-    @apply btn border border-bad/30 bg-bad/10 text-bad hover:bg-bad/20;
+    @apply btn border border-blaze/50 bg-blaze/10 text-blaze hover:bg-blaze/20;
   }
   .input {
-    @apply w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 text-sm text-white placeholder-white/30 outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20;
+    @apply w-full border border-white/10 bg-jet-800 px-3 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-carbinox;
   }
   .label {
-    @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-white/50;
+    @apply mb-1.5 block font-heading text-[10px] font-semibold uppercase tracking-brand text-white/50;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium;
+    @apply inline-flex items-center gap-1.5 border px-2.5 py-1 font-heading text-[10px] font-semibold uppercase tracking-brand;
   }
   .kbd {
-    @apply rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-white/60;
+    @apply border border-white/15 bg-white/[0.04] px-1.5 py-0.5 font-numeric text-[10px] text-white/70;
   }
-  .grid-bg {
-    background-image:
-      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-    background-size: 32px 32px;
+  /* Bracket-style label: [ LABEL ] */
+  .bracket {
+    @apply font-heading text-[10px] font-semibold uppercase tracking-brand text-white/60;
+  }
+  .bracket::before {
+    content: "[ ";
+    @apply text-carbinox/80;
+  }
+  .bracket::after {
+    content: " ]";
+    @apply text-carbinox/80;
   }
   .section-title {
-    @apply font-display text-xl font-semibold tracking-tight text-white;
+    @apply font-display text-4xl font-black uppercase leading-none tracking-brand text-white;
+  }
+  .sub-title {
+    @apply font-heading text-sm font-semibold uppercase tracking-brand text-white/70;
   }
   .muted {
     @apply text-white/50;
+  }
+  /* Crosshair "+" corner marker — placed on large panels */
+  .crosshair::before,
+  .crosshair::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-image:
+      linear-gradient(#f8c808, #f8c808),
+      linear-gradient(#f8c808, #f8c808);
+    background-size: 10px 1px, 1px 10px;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+  .crosshair::before {
+    top: -5px;
+    left: -5px;
+  }
+  .crosshair::after {
+    bottom: -5px;
+    right: -5px;
+  }
+  /* X-pattern background accent for hero panels */
+  .x-pattern {
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='110' viewBox='0 0 96 110'><g fill='none' stroke='%23f8c808' stroke-opacity='0.08' stroke-width='1.2'><polygon points='24,3 72,3 93,27 93,83 72,107 24,107 3,83 3,27'/><path d='M24 3 L72 107 M72 3 L24 107'/></g></svg>");
   }
 }
 
 /* recharts tweaks */
 .recharts-default-tooltip {
-  background: #0b0f16 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 10px !important;
-  font-size: 12px !important;
+  background: #0b0b0b !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 0 !important;
+  font-size: 11px !important;
+  font-family: "Chakra Petch", monospace !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.recharts-tooltip-label {
+  color: #f8c808 !important;
 }

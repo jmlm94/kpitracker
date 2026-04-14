@@ -16,9 +16,10 @@ export default function TeamPage() {
 
   return (
     <div>
-      <h1 className="section-title">Team</h1>
-      <p className="text-sm text-white/50">
-        Every KPI owner across Carbinox and their current pacing.
+      <div className="bracket">03 — Crew</div>
+      <h1 className="section-title mt-1">Team</h1>
+      <p className="mt-2 text-sm text-white/50">
+        Every KPI owner across Carbinox and their current pacing this month.
       </p>
       <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {state.team.map((m) => {

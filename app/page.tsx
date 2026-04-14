@@ -93,9 +93,10 @@ export default function DashboardPage() {
       <section className="mt-10">
         <div className="flex items-end justify-between">
           <div>
-            <h2 className="section-title">Departments</h2>
-            <p className="text-sm text-white/50">
-              Aggregated progress for every team, based on their owners' KPI targets.
+            <div className="bracket">02 — The Machine</div>
+            <h2 className="section-title mt-1">Departments</h2>
+            <p className="mt-1 text-sm text-white/50">
+              Aggregated progress across every team in the Carbinox revenue loop.
             </p>
           </div>
           <Link href="/departments" className="btn-ghost">
@@ -114,9 +115,10 @@ export default function DashboardPage() {
         <section className="mt-10">
           <div className="flex items-end justify-between">
             <div>
-              <h2 className="section-title">Needs attention</h2>
-              <p className="text-sm text-white/50">
-                KPIs furthest from pacing towards this month's target.
+              <div className="bracket text-bad">Red Flags</div>
+              <h2 className="section-title mt-1">Needs Attention</h2>
+              <p className="mt-1 text-sm text-white/50">
+                KPIs furthest from pacing toward this month's target. If red for 2 months → CEO review.
               </p>
             </div>
           </div>
@@ -145,9 +147,10 @@ export default function DashboardPage() {
       <section className="mt-10">
         <div className="flex items-end justify-between">
           <div>
-            <h2 className="section-title">All KPIs</h2>
-            <p className="text-sm text-white/50">
-              Live metrics pulled from your connected data sources.
+            <div className="bracket">Full Board</div>
+            <h2 className="section-title mt-1">All KPIs</h2>
+            <p className="mt-1 text-sm text-white/50">
+              Live metrics pulled from Shopify, Triple Whale, Klaviyo, Postscript, Zendesk & Google Sheets.
             </p>
           </div>
           <Link href="/kpis" className="btn-ghost">
@@ -201,11 +204,15 @@ function SummaryTile({
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between">
-        <div className="text-[11px] uppercase tracking-wider text-white/40">{label}</div>
-        <div className="rounded-md bg-white/5 p-1.5 text-white/60">{icon}</div>
+        <div className="bracket">{label}</div>
+        <div className="border border-white/10 bg-white/[0.02] p-1.5 text-white/70">{icon}</div>
       </div>
-      <div className={`mt-2 font-display text-2xl font-semibold ${toneClass}`}>{value}</div>
-      {hint && <div className="mt-1 text-xs text-white/50">{hint}</div>}
+      <div className={`mt-2 font-numeric text-3xl font-bold ${toneClass}`}>{value}</div>
+      {hint && (
+        <div className="mt-1 font-heading text-[10px] uppercase tracking-brand text-white/50">
+          {hint}
+        </div>
+      )}
     </div>
   );
 }

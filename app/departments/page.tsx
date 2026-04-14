@@ -8,9 +8,10 @@ export default function DepartmentsPage() {
   if (!ready) return null;
   return (
     <div>
-      <h1 className="section-title">Departments</h1>
-      <p className="text-sm text-white/50">
-        Every team at Carbinox, with live progress toward the month's targets.
+      <div className="bracket">02 — The Machine</div>
+      <h1 className="section-title mt-1">Departments</h1>
+      <p className="mt-2 text-sm text-white/50">
+        Every team at Carbinox, with live progress toward this month's targets.
       </p>
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {state.departments.map((d) => (

@@ -22,15 +22,8 @@ export function ProgressRing({
   const filled = Math.min(1, clamped) * circumference;
 
   const auto =
-    ratio >= 1.05
-      ? "#34d399"
-      : ratio >= 0.95
-        ? "#34d399"
-        : ratio >= 0.8
-          ? "#fbbf24"
-          : "#f87171";
-
-  const stroke_color = color || auto;
+    ratio >= 0.95 ? "#48f088" : ratio >= 0.8 ? "#f8c808" : "#e83028";
+  const strokeColor = color || auto;
 
   return (
     <div className="flex items-center gap-3">
@@ -47,9 +40,8 @@ export function ProgressRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={stroke_color}
+          stroke={strokeColor}
           strokeWidth={stroke}
-          strokeLinecap="round"
           fill="none"
           strokeDasharray={circumference}
           strokeDashoffset={circumference - filled}
@@ -57,8 +49,12 @@ export function ProgressRing({
         />
       </svg>
       <div className="leading-tight">
-        <div className="font-display text-xl font-semibold text-white">{displayPct}%</div>
-        {label && <div className="text-[11px] uppercase tracking-wider text-white/50">{label}</div>}
+        <div className="font-numeric text-xl font-bold text-white">{displayPct}%</div>
+        {label && (
+          <div className="font-heading text-[10px] font-semibold uppercase tracking-brand text-white/50">
+            {label}
+          </div>
+        )}
         {sublabel && <div className="text-xs text-white/60">{sublabel}</div>}
       </div>
     </div>

@@ -96,12 +96,13 @@ export default function OnboardingPage() {
       </div>
 
       <div className="mt-5">
-        <h1 className="font-display text-2xl font-semibold text-white">
-          Welcome to Carbinox KPI Tracker
+        <div className="bracket">Onboarding</div>
+        <h1 className="section-title mt-1">
+          Welcome to <span className="text-carbinox">Carbinox</span> KPI Command
         </h1>
-        <p className="mt-1 max-w-2xl text-sm text-white/60">
-          Let's get your org set up. You can always edit everything later from
-          the Team, Departments, KPIs, and Integrations pages.
+        <p className="mt-2 max-w-2xl text-sm text-white/60">
+          Let's get the org wired up. You can edit everything later from the
+          Team, Departments, KPIs, and Integrations pages.
         </p>
       </div>
 

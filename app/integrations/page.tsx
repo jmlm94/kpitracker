@@ -43,8 +43,9 @@ export default function IntegrationsPage() {
 
   return (
     <div>
-      <h1 className="section-title">Integrations</h1>
-      <p className="text-sm text-white/50">
+      <div className="bracket">05 — Data Feeds</div>
+      <h1 className="section-title mt-1">Integrations</h1>
+      <p className="mt-2 text-sm text-white/50">
         Connect Carbinox's data sources. Credentials live in Vercel environment
         variables. Toggle what's active and trigger a test sync anytime.
       </p>
