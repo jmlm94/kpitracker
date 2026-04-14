@@ -9,6 +9,7 @@ import {
   Target,
   Plug,
   Sparkles,
+  Network,
 } from "lucide-react";
 import { Wordmark } from "./Logo";
 import { cx } from "@/lib/format";
@@ -19,6 +20,7 @@ const nav = [
   { href: "/team", label: "Team", icon: Users, code: "03" },
   { href: "/kpis", label: "KPIs & Targets", icon: Target, code: "04" },
   { href: "/integrations", label: "Integrations", icon: Plug, code: "05" },
+  { href: "/org-chart", label: "Org Chart", icon: Network, code: "06" },
 ];
 
 export function Sidebar() {
