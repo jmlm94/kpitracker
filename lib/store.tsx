@@ -45,6 +45,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const raw = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
       if (raw) {
         const parsed = JSON.parse(raw) as AppState;
+        // Back-compat: older state didn't have Department.kind. Derive from parentId.
+        parsed.departments = parsed.departments.map((d) =>
+          (d as any).kind ? d : { ...d, kind: d.parentId ? "sub" : "main" },
+        );
         rawSetState(parsed);
       }
     } catch {

@@ -13,36 +13,36 @@ import type { AppState, KPI, Target, TeamMember, Department } from "./types";
 const PERIOD = currentMonthKey();
 
 const departments: Department[] = [
-  // Top-level departments
-  { id: "dep_exec", name: "Executive", color: "#f8f8f8", headId: "tm_ceo" },
-  { id: "dep_marketing", name: "Marketing", color: "#f8c808", headId: "tm_ceo" },
-  { id: "dep_experience", name: "Experience", color: "#ffd833", headId: "tm_ceo" },
-  { id: "dep_website", name: "Website", color: "#48f088", headId: "tm_cro" },
-  { id: "dep_channels", name: "Other Channels", color: "#d0f800", headId: "tm_amazon" },
-  { id: "dep_logistics", name: "Logistics", color: "#408038", headId: "tm_supply" },
-  { id: "dep_finance", name: "Finance", color: "#ffffff", headId: "tm_finance" },
+  // Main departments
+  { id: "dep_exec", name: "Executive", color: "#f8f8f8", kind: "main", headId: "tm_ceo" },
+  { id: "dep_marketing", name: "Marketing", color: "#f8c808", kind: "main", headId: "tm_ceo" },
+  { id: "dep_experience", name: "Experience", color: "#ffd833", kind: "main", headId: "tm_ceo" },
+  { id: "dep_website", name: "Website", color: "#48f088", kind: "main", headId: "tm_cro" },
+  { id: "dep_channels", name: "Other Channels", color: "#d0f800", kind: "main", headId: "tm_amazon" },
+  { id: "dep_logistics", name: "Logistics", color: "#408038", kind: "main", headId: "tm_supply" },
+  { id: "dep_finance", name: "Finance", color: "#ffffff", kind: "main", headId: "tm_finance" },
 
   // Marketing sub-departments
-  { id: "dep_advertising", name: "Advertising", color: "#f06020", parentId: "dep_marketing", headId: "tm_damian" },
-  { id: "dep_creative", name: "Creative", color: "#e83028", parentId: "dep_marketing", headId: "tm_creative_strat" },
-  { id: "dep_organic", name: "Organic & Retention", color: "#10a0f8", parentId: "dep_marketing", headId: "tm_samra_email" },
+  { id: "dep_advertising", name: "Advertising", color: "#f06020", kind: "sub", parentId: "dep_marketing", headId: "tm_damian" },
+  { id: "dep_creative", name: "Creative", color: "#e83028", kind: "sub", parentId: "dep_marketing", headId: "tm_creative_strat" },
+  { id: "dep_organic", name: "Organic & Retention", color: "#10a0f8", kind: "sub", parentId: "dep_marketing", headId: "tm_samra_email" },
 
   // Experience sub-departments
-  { id: "dep_cs", name: "Customer Success", color: "#ffd833", parentId: "dep_experience", headId: "tm_justine" },
-  { id: "dep_team_success", name: "Team Success", color: "#ff6b4a", parentId: "dep_experience", headId: "tm_ceo" },
+  { id: "dep_cs", name: "Customer Success", color: "#ffd833", kind: "sub", parentId: "dep_experience", headId: "tm_justine" },
+  { id: "dep_team_success", name: "Team Success", color: "#ff6b4a", kind: "sub", parentId: "dep_experience", headId: "tm_ceo" },
 
   // Website sub-departments
-  { id: "dep_lp", name: "Landing Pages", color: "#34d399", parentId: "dep_website", headId: "tm_lp" },
-  { id: "dep_cro", name: "CRO", color: "#2dd4bf", parentId: "dep_website", headId: "tm_cro" },
+  { id: "dep_lp", name: "Landing Pages", color: "#34d399", kind: "sub", parentId: "dep_website", headId: "tm_lp" },
+  { id: "dep_cro", name: "CRO", color: "#2dd4bf", kind: "sub", parentId: "dep_website", headId: "tm_cro" },
 
   // Other Channels sub-departments
-  { id: "dep_amazon", name: "Amazon", color: "#ff9900", parentId: "dep_channels", headId: "tm_amazon" },
-  { id: "dep_ttshop", name: "TikTok Shop", color: "#e83028", parentId: "dep_channels", headId: "tm_ttshop" },
-  { id: "dep_marketplace", name: "Walmart & Other", color: "#10a0f8", parentId: "dep_channels", headId: "tm_walmart" },
+  { id: "dep_amazon", name: "Amazon", color: "#ff9900", kind: "sub", parentId: "dep_channels", headId: "tm_amazon" },
+  { id: "dep_ttshop", name: "TikTok Shop", color: "#e83028", kind: "sub", parentId: "dep_channels", headId: "tm_ttshop" },
+  { id: "dep_marketplace", name: "Walmart & Other", color: "#10a0f8", kind: "sub", parentId: "dep_channels", headId: "tm_walmart" },
 
   // Logistics sub-departments
-  { id: "dep_supply", name: "Supply Chain", color: "#86efac", parentId: "dep_logistics", headId: "tm_supply" },
-  { id: "dep_fulfillment", name: "Fulfillment", color: "#4ade80", parentId: "dep_logistics", headId: "tm_elias" },
+  { id: "dep_supply", name: "Supply Chain", color: "#86efac", kind: "sub", parentId: "dep_logistics", headId: "tm_supply" },
+  { id: "dep_fulfillment", name: "Fulfillment", color: "#4ade80", kind: "sub", parentId: "dep_logistics", headId: "tm_elias" },
 ];
 
 const team: TeamMember[] = [

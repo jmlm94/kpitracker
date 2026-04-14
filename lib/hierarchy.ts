@@ -17,13 +17,22 @@ export function descendantDepartmentIds(state: AppState, rootId: string): string
   return [...out];
 }
 
-/** Top-level departments (those without a parent). */
+/** Top-level (Main) departments. */
 export function rootDepartments(state: AppState): Department[] {
-  return state.departments.filter((d) => !d.parentId);
+  return state.departments.filter((d) => d.kind === "main");
 }
 
 export function childDepartments(state: AppState, parentId: string): Department[] {
-  return state.departments.filter((d) => d.parentId === parentId);
+  return state.departments.filter(
+    (d) => d.kind === "sub" && d.parentId === parentId,
+  );
+}
+
+/** Sub-departments that have no parent assigned yet. */
+export function unassignedSubs(state: AppState): Department[] {
+  return state.departments.filter(
+    (d) => d.kind === "sub" && !d.parentId,
+  );
 }
 
 /** All targets owned by people assigned to this department or any descendant. */

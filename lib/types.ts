@@ -63,7 +63,9 @@ export type Department = {
   id: string;
   name: string;
   color: string;
-  /** Optional parent department, enabling hierarchy (e.g. Advertising → Marketing) */
+  /** Main = top-level department. Sub = nested underneath a Main. */
+  kind: "main" | "sub";
+  /** For Subs: the Main department they belong to (undefined = unassigned) */
   parentId?: string;
   /** Team member responsible for this department / sub-department */
   headId?: string;
