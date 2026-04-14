@@ -5,12 +5,12 @@ import type { Department, AppState } from "@/lib/types";
 import {
   classifyStatus,
   cx,
-  pickProgressValue,
-  progressRatio,
   statusBg,
   statusLabel,
   statusSolid,
 } from "@/lib/format";
+import { aggregateDepartmentStats, childDepartments } from "@/lib/hierarchy";
+import { Avatar } from "./Avatar";
 
 export function DepartmentCard({
   department,
@@ -19,30 +19,12 @@ export function DepartmentCard({
   department: Department;
   state: AppState;
 }) {
-  const members = state.team.filter((t) => t.departmentId === department.id);
-  const memberIds = new Set(members.map((m) => m.id));
-  const deptTargets = state.targets.filter((t) => memberIds.has(t.ownerId));
-
-  let sum = 0;
-  let ok = 0;
-  let risk = 0;
-  let off = 0;
-  deptTargets.forEach((t) => {
-    const kpi = state.kpis.find((k) => k.id === t.kpiId);
-    const p = state.progress[t.id];
-    if (!kpi || !p) return;
-    const actual = pickProgressValue(kpi, p);
-    const r = progressRatio(kpi, t, actual);
-    sum += Math.min(1.2, r);
-    const s = classifyStatus(r);
-    if (s === "ahead" || s === "on_track") ok++;
-    else if (s === "at_risk") risk++;
-    else off++;
-  });
-
-  const avg = deptTargets.length ? sum / deptTargets.length : 0;
-  const status = classifyStatus(avg);
+  const stats = aggregateDepartmentStats(state, department.id);
+  const status = classifyStatus(stats.avgRatio);
   const fillColor = statusSolid(status);
+  const head = state.team.find((m) => m.id === department.headId);
+  const subs = childDepartments(state, department.id);
+  const directMembers = state.team.filter((t) => t.departmentId === department.id);
 
   return (
     <Link
@@ -57,13 +39,14 @@ export function DepartmentCard({
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="bracket">{department.name}</div>
+          <div className="bracket">{subs.length > 0 ? "Parent Dept" : "Department"}</div>
           <h3 className="mt-2 font-display text-3xl font-extrabold uppercase leading-none tracking-brand text-white">
             {department.name}
           </h3>
           <div className="mt-1.5 font-numeric text-[11px] uppercase tracking-brand text-white/55">
-            {members.length} {members.length === 1 ? "person" : "people"} ·{" "}
-            {deptTargets.length} KPI{deptTargets.length === 1 ? "" : "s"}
+            {directMembers.length + subs.reduce((n, s) => n + state.team.filter((t) => t.departmentId === s.id).length, 0)}{" "}
+            people · {stats.count} KPI{stats.count === 1 ? "" : "s"}
+            {subs.length > 0 && ` · ${subs.length} sub-depts`}
           </div>
         </div>
         <span className={cx("chip", statusBg(status))}>
@@ -72,16 +55,28 @@ export function DepartmentCard({
         </span>
       </div>
 
-      <div className="mt-5">
+      {head && (
+        <div className="mt-4 flex items-center gap-2.5 border-t border-white/5 pt-3">
+          <Avatar name={head.name} size={26} color={department.color} />
+          <div className="min-w-0 leading-tight">
+            <div className="bracket">Head</div>
+            <div className="truncate font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
+              {head.name}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4">
         <div className="flex items-center justify-between font-heading text-[10px] uppercase tracking-brand text-white/50">
           <span>Overall Progress</span>
-          <span className="font-numeric text-white">{Math.round(avg * 100)}%</span>
+          <span className="font-numeric text-white">{Math.round(stats.avgRatio * 100)}%</span>
         </div>
         <div className="mt-2 h-2 w-full border border-white/5 bg-white/[0.03]">
           <div
             className="h-full"
             style={{
-              width: `${Math.min(100, avg * 100)}%`,
+              width: `${Math.min(100, stats.avgRatio * 100)}%`,
               background: fillColor,
             }}
           />
@@ -89,10 +84,25 @@ export function DepartmentCard({
       </div>
 
       <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-        <Stat label="On track" value={ok} color="#48f088" />
-        <Stat label="At risk" value={risk} color="#f8c808" />
-        <Stat label="Off track" value={off} color="#e83028" />
+        <Stat label="On track" value={stats.ahead + stats.on_track} color="#48f088" />
+        <Stat label="At risk" value={stats.at_risk} color="#f8c808" />
+        <Stat label="Off track" value={stats.off_track} color="#e83028" />
       </div>
+
+      {subs.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {subs.map((s) => (
+            <span
+              key={s.id}
+              className="chip border-white/10 bg-white/[0.03] text-white/70"
+              style={{ borderColor: `${s.color}40` }}
+            >
+              <span className="h-1.5 w-1.5" style={{ background: s.color }} />
+              {s.name}
+            </span>
+          ))}
+        </div>
+      )}
     </Link>
   );
 }

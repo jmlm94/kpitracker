@@ -204,6 +204,8 @@ function DepartmentsStep({
 }) {
   const [name, setName] = useState("");
   const [color, setColor] = useState(paletteColors[0]);
+  const [parentId, setParentId] = useState<string>("");
+  const [headId, setHeadId] = useState<string>("");
 
   function add() {
     if (!name.trim()) return;
@@ -211,89 +213,230 @@ function DepartmentsStep({
       id: "dep_" + Math.random().toString(36).slice(2, 8),
       name: name.trim(),
       color,
+      parentId: parentId || undefined,
+      headId: headId || undefined,
     });
     setName("");
+    setParentId("");
+    setHeadId("");
   }
 
+  const roots = state.departments.filter((d) => !d.parentId);
+
   return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="section-title">Departments</h2>
-          <p className="text-sm text-white/50">
-            Create the teams you want to track. Examples: Advertising, Retention,
-            CS, Ops, Creative.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-        {state.departments.map((d) => (
-          <div key={d.id} className="card flex items-center gap-3 p-3">
-            <div
-              className="h-10 w-10 rounded-lg"
-              style={{ background: `linear-gradient(135deg, ${d.color}, transparent)` }}
-            />
-            <div className="min-w-0 flex-1">
-              <input
-                defaultValue={d.name}
-                onBlur={(e) => upsert({ ...d, name: e.target.value })}
-                className="w-full bg-transparent text-sm font-medium text-white outline-none"
-              />
-              <div className="mt-1 flex items-center gap-1.5">
-                {paletteColors.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => upsert({ ...d, color: c })}
-                    style={{ background: c }}
-                    className={cx(
-                      "h-3.5 w-3.5 rounded-full ring-offset-2 ring-offset-ink-900",
-                      d.color === c ? "ring-2 ring-white/60" : "",
-                    )}
-                  />
-                ))}
-              </div>
-            </div>
-            <button onClick={() => remove(d.id)} className="btn-ghost">
-              <Trash2 size={14} />
-            </button>
+    <div className="space-y-5">
+      <div className="card p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="section-title">Departments</h2>
+            <p className="mt-1 text-sm text-white/50">
+              Create teams and sub-teams. Assign one head per department.
+              Example: Advertising lives under Marketing; Customer Success lives
+              under Experience.
+            </p>
           </div>
-        ))}
+        </div>
+
+        {/* Hierarchical list */}
+        <div className="mt-5 space-y-2">
+          {roots.map((root) => (
+            <DeptRowEditor
+              key={root.id}
+              department={root}
+              state={state}
+              upsert={upsert}
+              remove={remove}
+              depth={0}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="mt-6 flex items-end gap-3">
-        <div className="flex-1">
-          <label className="label">Department name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Logistics"
-            className="input"
-            onKeyDown={(e) => e.key === "Enter" && add()}
-          />
+      {/* Add form */}
+      <div className="card p-5">
+        <h3 className="sub-title">Add department or sub-department</h3>
+        <div className="mt-4 grid grid-cols-12 items-end gap-3">
+          <div className="col-span-3">
+            <label className="label">Name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Advertising"
+              className="input"
+              onKeyDown={(e) => e.key === "Enter" && add()}
+            />
+          </div>
+          <div className="col-span-3">
+            <label className="label">Parent department</label>
+            <select
+              value={parentId}
+              onChange={(e) => setParentId(e.target.value)}
+              className="input"
+            >
+              <option value="">— None (top-level)</option>
+              {state.departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {depLabel(state, d.id)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-3">
+            <label className="label">Head (responsible)</label>
+            <select
+              value={headId}
+              onChange={(e) => setHeadId(e.target.value)}
+              className="input"
+            >
+              <option value="">— None yet</option>
+              {state.team.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} — {m.position}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="label">Color</label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {paletteColors.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  style={{ background: c }}
+                  className={cx(
+                    "h-6 w-6 border",
+                    color === c ? "ring-2 ring-white/80" : "border-white/10",
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+          <button onClick={add} className="btn-primary col-span-1 justify-center">
+            <Plus size={14} />
+          </button>
         </div>
-        <div>
-          <label className="label">Color</label>
-          <div className="flex items-center gap-1.5">
+      </div>
+    </div>
+  );
+}
+
+function DeptRowEditor({
+  department,
+  state,
+  upsert,
+  remove,
+  depth,
+}: {
+  department: Department;
+  state: ReturnType<typeof useStore>["state"];
+  upsert: (d: Department) => void;
+  remove: (id: string) => void;
+  depth: number;
+}) {
+  const children = state.departments.filter((d) => d.parentId === department.id);
+  return (
+    <>
+      <div
+        className="flex items-center gap-3 border border-white/10 bg-white/[0.02] p-3"
+        style={{ marginLeft: `${depth * 20}px` }}
+      >
+        {depth > 0 && (
+          <span className="font-numeric text-[10px] text-white/30">└</span>
+        )}
+        <div
+          className="h-8 w-8 shrink-0 border border-white/10"
+          style={{ background: department.color }}
+        />
+        <div className="grid flex-1 grid-cols-12 items-center gap-2">
+          <input
+            defaultValue={department.name}
+            onBlur={(e) => upsert({ ...department, name: e.target.value })}
+            className="input col-span-3 bg-transparent"
+          />
+          <select
+            value={department.parentId || ""}
+            onChange={(e) =>
+              upsert({ ...department, parentId: e.target.value || undefined })
+            }
+            className="input col-span-3"
+          >
+            <option value="">Top-level</option>
+            {state.departments
+              .filter((d) => d.id !== department.id && !isDescendantOf(state, d.id, department.id))
+              .map((d) => (
+                <option key={d.id} value={d.id}>
+                  {depLabel(state, d.id)}
+                </option>
+              ))}
+          </select>
+          <select
+            value={department.headId || ""}
+            onChange={(e) =>
+              upsert({ ...department, headId: e.target.value || undefined })
+            }
+            className="input col-span-4"
+          >
+            <option value="">No head</option>
+            {state.team.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} — {m.position}
+              </option>
+            ))}
+          </select>
+          <div className="col-span-2 flex flex-wrap items-center gap-1">
             {paletteColors.map((c) => (
               <button
                 key={c}
-                onClick={() => setColor(c)}
+                onClick={() => upsert({ ...department, color: c })}
                 style={{ background: c }}
                 className={cx(
-                  "h-7 w-7 rounded-md",
-                  color === c ? "ring-2 ring-white/70" : "",
+                  "h-4 w-4 border",
+                  department.color === c ? "ring-2 ring-white/80" : "border-white/10",
                 )}
               />
             ))}
           </div>
         </div>
-        <button onClick={add} className="btn-primary">
-          <Plus size={14} /> Add
+        <button onClick={() => remove(department.id)} className="btn-ghost">
+          <Trash2 size={14} />
         </button>
       </div>
-    </div>
+      {children.map((c) => (
+        <DeptRowEditor
+          key={c.id}
+          department={c}
+          state={state}
+          upsert={upsert}
+          remove={remove}
+          depth={depth + 1}
+        />
+      ))}
+    </>
   );
+}
+
+function depLabel(state: ReturnType<typeof useStore>["state"], id: string): string {
+  const parts: string[] = [];
+  let cur: Department | undefined = state.departments.find((d) => d.id === id);
+  while (cur) {
+    parts.unshift(cur.name);
+    cur = cur.parentId ? state.departments.find((d) => d.id === cur!.parentId) : undefined;
+  }
+  return parts.join(" / ");
+}
+
+function isDescendantOf(
+  state: ReturnType<typeof useStore>["state"],
+  candidateId: string,
+  ancestorId: string,
+): boolean {
+  let cur = state.departments.find((d) => d.id === candidateId);
+  while (cur?.parentId) {
+    if (cur.parentId === ancestorId) return true;
+    cur = state.departments.find((d) => d.id === cur!.parentId);
+  }
+  return false;
 }
 
 /* ------------ STEP 2 ------------ */

@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { KPICard } from "@/components/KPICard";
+import { DepartmentCard } from "@/components/DepartmentCard";
 import { Avatar } from "@/components/Avatar";
 import {
   classifyStatus,
@@ -12,7 +13,12 @@ import {
   statusBg,
   statusLabel,
 } from "@/lib/format";
-import { ArrowLeft } from "lucide-react";
+import {
+  aggregateDepartmentStats,
+  childDepartments,
+  targetsForDepartment,
+} from "@/lib/hierarchy";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 
 export default function DepartmentDetailPage() {
   const { state, ready } = useStore();
@@ -30,114 +36,167 @@ export default function DepartmentDetailPage() {
       </div>
     );
   }
-  const members = state.team.filter((t) => t.departmentId === id);
-  const memberIds = new Set(members.map((m) => m.id));
-  const targets = state.targets.filter((t) => memberIds.has(t.ownerId));
+  const parent = dept.parentId ? state.departments.find((d) => d.id === dept.parentId) : undefined;
+  const subs = childDepartments(state, id);
+  const stats = aggregateDepartmentStats(state, id);
+  const status = classifyStatus(stats.avgRatio);
   const head = state.team.find((m) => m.id === dept.headId);
-
-  let sum = 0;
-  targets.forEach((t) => {
-    const kpi = state.kpis.find((k) => k.id === t.kpiId);
-    const p = state.progress[t.id];
-    if (!kpi || !p) return;
-    sum += Math.min(1.2, progressRatio(kpi, t, pickProgressValue(kpi, p)));
-  });
-  const avg = targets.length ? sum / targets.length : 0;
-  const status = classifyStatus(avg);
+  const directMembers = state.team.filter((t) => t.departmentId === id);
+  const ownTargets = targetsForDepartment(state, id);
 
   return (
     <div>
-      <Link href="/departments" className="btn-ghost">
-        <ArrowLeft size={14} /> Departments
-      </Link>
-      <div className="card mt-4 overflow-hidden p-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs text-white/50">
+        <Link href="/departments" className="flex items-center gap-1 hover:text-white">
+          <ArrowLeft size={12} /> Departments
+        </Link>
+        {parent && (
+          <>
+            <ChevronRight size={12} className="text-white/30" />
+            <Link
+              href={`/departments/${parent.id}`}
+              className="hover:text-white"
+            >
+              {parent.name}
+            </Link>
+          </>
+        )}
+        <ChevronRight size={12} className="text-white/30" />
+        <span className="text-white">{dept.name}</span>
+      </div>
+
+      <div className="card crosshair mt-4 p-6">
         <div
           aria-hidden
-          className="absolute -right-12 -top-12 h-48 w-48 rounded-full opacity-20 blur-3xl"
+          className="absolute inset-x-0 top-0 h-[2px]"
           style={{ background: dept.color }}
         />
         <div className="flex items-center gap-4">
           <div
-            className="h-12 w-12 rounded-xl"
-            style={{ background: `linear-gradient(135deg, ${dept.color}, transparent)` }}
+            className="h-12 w-12 border border-white/10"
+            style={{ background: dept.color }}
           />
           <div>
-            <h1 className="font-display text-2xl font-semibold text-white">{dept.name}</h1>
-            <div className="text-sm text-white/50">
-              {members.length} people · {targets.length} KPIs tracked
+            <div className="bracket">
+              {subs.length > 0 ? "Parent Department" : "Department"}
+            </div>
+            <h1 className="mt-1 font-display text-4xl font-extrabold uppercase leading-none tracking-brand text-white">
+              {dept.name}
+            </h1>
+            <div className="mt-1.5 font-numeric text-[11px] uppercase tracking-brand text-white/55">
+              {directMembers.length} direct report{directMembers.length === 1 ? "" : "s"}
+              {subs.length > 0 && ` · ${subs.length} sub-department${subs.length === 1 ? "" : "s"}`}
+              {" · "}
+              {ownTargets.length} KPI{ownTargets.length === 1 ? "" : "s"}
             </div>
           </div>
           <span className={`chip ml-auto ${statusBg(status)}`}>
-            <span className="h-1.5 w-1.5 rounded-full bg-current" />
-            {statusLabel(status)} · {Math.round(avg * 100)}%
+            <span className="h-1.5 w-1.5 bg-current" />
+            {statusLabel(status)} · {Math.round(stats.avgRatio * 100)}%
           </span>
         </div>
-        {head && (
-          <div className="mt-5 flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3">
+
+        {head ? (
+          <div className="mt-5 flex items-center gap-3 border border-white/10 bg-white/[0.02] p-3">
             <Avatar name={head.name} color={dept.color} size={36} />
             <div className="text-sm">
-              <div className="font-medium text-white">{head.name}</div>
-              <div className="text-white/50">Head of department · {head.position}</div>
+              <div className="bracket">Head of {dept.name}</div>
+              <div className="mt-0.5 font-heading font-semibold uppercase tracking-brand text-white">
+                {head.name}
+              </div>
+              <div className="text-xs text-white/50">{head.position}</div>
             </div>
             <Link href={`/team/${head.id}`} className="btn-ghost ml-auto">
               View profile
             </Link>
           </div>
+        ) : (
+          <div className="mt-5 border border-warn/30 bg-warn/5 p-3 text-sm text-warn">
+            No head assigned. Pick one from Onboarding → Departments.
+          </div>
         )}
       </div>
 
-      <section className="mt-8">
-        <h2 className="section-title">Team</h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {members.map((m) => {
-            const ownerTargets = targets.filter((t) => t.ownerId === m.id);
-            let s = 0;
-            ownerTargets.forEach((t) => {
-              const kpi = state.kpis.find((k) => k.id === t.kpiId);
-              const p = state.progress[t.id];
-              if (!kpi || !p) return;
-              s += Math.min(1.2, progressRatio(kpi, t, pickProgressValue(kpi, p)));
-            });
-            const a = ownerTargets.length ? s / ownerTargets.length : 0;
-            const st = classifyStatus(a);
-            return (
-              <Link
-                key={m.id}
-                href={`/team/${m.id}`}
-                className="card card-hover flex items-center gap-3 p-4"
-              >
-                <Avatar name={m.name} color={dept.color} size={40} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-white">{m.name}</div>
-                  <div className="truncate text-xs text-white/50">{m.position}</div>
-                </div>
-                <span className={`chip ${statusBg(st)}`}>{Math.round(a * 100)}%</span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      {/* Sub-departments */}
+      {subs.length > 0 && (
+        <section className="mt-8">
+          <h2 className="section-title">Sub-departments</h2>
+          <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {subs.map((s) => (
+              <DepartmentCard key={s.id} department={s} state={state} />
+            ))}
+          </div>
+        </section>
+      )}
 
-      <section className="mt-8">
-        <h2 className="section-title">KPIs</h2>
-        <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {targets.map((t) => {
-            const kpi = state.kpis.find((k) => k.id === t.kpiId);
-            if (!kpi) return null;
-            const owner = state.team.find((m) => m.id === t.ownerId);
-            return (
-              <KPICard
-                key={t.id}
-                kpi={kpi}
-                target={t}
-                progress={state.progress[t.id]}
-                owner={owner}
-                deptColor={dept.color}
-              />
-            );
-          })}
-        </div>
-      </section>
+      {/* Team members assigned directly to this department */}
+      {directMembers.length > 0 && (
+        <section className="mt-8">
+          <h2 className="section-title">
+            {subs.length > 0 ? "Direct team" : "Team"}
+          </h2>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {directMembers.map((m) => {
+              const memberTargets = state.targets.filter((t) => t.ownerId === m.id);
+              let s = 0;
+              memberTargets.forEach((t) => {
+                const kpi = state.kpis.find((k) => k.id === t.kpiId);
+                const p = state.progress[t.id];
+                if (!kpi || !p) return;
+                s += Math.min(1.2, progressRatio(kpi, t, pickProgressValue(kpi, p)));
+              });
+              const a = memberTargets.length ? s / memberTargets.length : 0;
+              const st = classifyStatus(a);
+              return (
+                <Link
+                  key={m.id}
+                  href={`/team/${m.id}`}
+                  className="card card-hover flex items-center gap-3 p-4"
+                >
+                  <Avatar name={m.name} color={dept.color} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
+                      {m.name}
+                    </div>
+                    <div className="truncate text-xs text-white/50">{m.position}</div>
+                  </div>
+                  <span className={`chip ${statusBg(st)}`}>{Math.round(a * 100)}%</span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Aggregated KPIs (inclusive of descendants) */}
+      {ownTargets.length > 0 && (
+        <section className="mt-8">
+          <h2 className="section-title">KPIs</h2>
+          <p className="mt-1 text-sm text-white/50">
+            Every KPI owned by someone in {dept.name}
+            {subs.length > 0 && " or its sub-departments"}.
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {ownTargets.map((t) => {
+              const kpi = state.kpis.find((k) => k.id === t.kpiId);
+              if (!kpi) return null;
+              const owner = state.team.find((m) => m.id === t.ownerId);
+              const ownerDept = state.departments.find((d) => d.id === owner?.departmentId);
+              return (
+                <KPICard
+                  key={t.id}
+                  kpi={kpi}
+                  target={t}
+                  progress={state.progress[t.id]}
+                  owner={owner}
+                  deptColor={ownerDept?.color || dept.color}
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -104,9 +104,11 @@ export default function DashboardPage() {
           </Link>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {state.departments.map((d) => (
-            <DepartmentCard key={d.id} department={d} state={state} />
-          ))}
+          {state.departments
+            .filter((d) => !d.parentId)
+            .map((d) => (
+              <DepartmentCard key={d.id} department={d} state={state} />
+            ))}
         </div>
       </section>
 

@@ -63,6 +63,9 @@ export type Department = {
   id: string;
   name: string;
   color: string;
+  /** Optional parent department, enabling hierarchy (e.g. Advertising → Marketing) */
+  parentId?: string;
+  /** Team member responsible for this department / sub-department */
   headId?: string;
 };
 

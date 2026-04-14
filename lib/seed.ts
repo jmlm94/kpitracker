@@ -13,16 +13,36 @@ import type { AppState, KPI, Target, TeamMember, Department } from "./types";
 const PERIOD = currentMonthKey();
 
 const departments: Department[] = [
-  { id: "dep_marketing", name: "Marketing", color: "#f8c808", headId: "tm_ceo" },
-  { id: "dep_advertising", name: "Advertising", color: "#f06020", headId: "tm_damian" },
-  { id: "dep_creative", name: "Creative", color: "#e83028" },
-  { id: "dep_organic", name: "Organic & Retention", color: "#10a0f8" },
-  { id: "dep_website", name: "Website", color: "#48f088" },
-  { id: "dep_channels", name: "Other Channels", color: "#d0f800" },
-  { id: "dep_logistics", name: "Logistics", color: "#408038" },
-  { id: "dep_cs", name: "Customer Success", color: "#ffd833" },
-  { id: "dep_finance", name: "Finance", color: "#ffffff" },
+  // Top-level departments
   { id: "dep_exec", name: "Executive", color: "#f8f8f8", headId: "tm_ceo" },
+  { id: "dep_marketing", name: "Marketing", color: "#f8c808", headId: "tm_ceo" },
+  { id: "dep_experience", name: "Experience", color: "#ffd833", headId: "tm_ceo" },
+  { id: "dep_website", name: "Website", color: "#48f088", headId: "tm_cro" },
+  { id: "dep_channels", name: "Other Channels", color: "#d0f800", headId: "tm_amazon" },
+  { id: "dep_logistics", name: "Logistics", color: "#408038", headId: "tm_supply" },
+  { id: "dep_finance", name: "Finance", color: "#ffffff", headId: "tm_finance" },
+
+  // Marketing sub-departments
+  { id: "dep_advertising", name: "Advertising", color: "#f06020", parentId: "dep_marketing", headId: "tm_damian" },
+  { id: "dep_creative", name: "Creative", color: "#e83028", parentId: "dep_marketing", headId: "tm_creative_strat" },
+  { id: "dep_organic", name: "Organic & Retention", color: "#10a0f8", parentId: "dep_marketing", headId: "tm_samra_email" },
+
+  // Experience sub-departments
+  { id: "dep_cs", name: "Customer Success", color: "#ffd833", parentId: "dep_experience", headId: "tm_justine" },
+  { id: "dep_team_success", name: "Team Success", color: "#ff6b4a", parentId: "dep_experience", headId: "tm_ceo" },
+
+  // Website sub-departments
+  { id: "dep_lp", name: "Landing Pages", color: "#34d399", parentId: "dep_website", headId: "tm_lp" },
+  { id: "dep_cro", name: "CRO", color: "#2dd4bf", parentId: "dep_website", headId: "tm_cro" },
+
+  // Other Channels sub-departments
+  { id: "dep_amazon", name: "Amazon", color: "#ff9900", parentId: "dep_channels", headId: "tm_amazon" },
+  { id: "dep_ttshop", name: "TikTok Shop", color: "#e83028", parentId: "dep_channels", headId: "tm_ttshop" },
+  { id: "dep_marketplace", name: "Walmart & Other", color: "#10a0f8", parentId: "dep_channels", headId: "tm_walmart" },
+
+  // Logistics sub-departments
+  { id: "dep_supply", name: "Supply Chain", color: "#86efac", parentId: "dep_logistics", headId: "tm_supply" },
+  { id: "dep_fulfillment", name: "Fulfillment", color: "#4ade80", parentId: "dep_logistics", headId: "tm_elias" },
 ];
 
 const team: TeamMember[] = [
@@ -48,20 +68,20 @@ const team: TeamMember[] = [
   { id: "tm_samra_email", name: "Samra", position: "Email & SMS Specialist", departmentId: "dep_organic", managerId: "tm_ceo" },
   { id: "tm_jesus", name: "Jesus", position: "Social Media Manager", departmentId: "dep_organic", managerId: "tm_ceo" },
 
-  // Website
-  { id: "tm_lp", name: "Landing Page Specialist", position: "LP Specialist", departmentId: "dep_website", managerId: "tm_ceo" },
-  { id: "tm_cro", name: "CRO Specialist", position: "CRO Specialist", departmentId: "dep_website", managerId: "tm_ceo" },
+  // Website → Landing Pages / CRO
+  { id: "tm_lp", name: "Landing Page Specialist", position: "LP Specialist", departmentId: "dep_lp", managerId: "tm_ceo" },
+  { id: "tm_cro", name: "CRO Specialist", position: "CRO Specialist", departmentId: "dep_cro", managerId: "tm_ceo" },
 
-  // Other Channels
-  { id: "tm_amazon", name: "Amazon Channel Manager", position: "Amazon Manager", departmentId: "dep_channels", managerId: "tm_ceo" },
-  { id: "tm_ttshop", name: "TikTok Shop Manager", position: "TikTok Shop Manager", departmentId: "dep_channels", managerId: "tm_ceo" },
-  { id: "tm_walmart", name: "Walmart & Other", position: "Marketplace Manager", departmentId: "dep_channels", managerId: "tm_ceo" },
+  // Other Channels → Amazon / TikTok Shop / Walmart
+  { id: "tm_amazon", name: "Amazon Channel Manager", position: "Amazon Manager", departmentId: "dep_amazon", managerId: "tm_ceo" },
+  { id: "tm_ttshop", name: "TikTok Shop Manager", position: "TikTok Shop Manager", departmentId: "dep_ttshop", managerId: "tm_ceo" },
+  { id: "tm_walmart", name: "Walmart & Other", position: "Marketplace Manager", departmentId: "dep_marketplace", managerId: "tm_ceo" },
 
-  // Logistics
-  { id: "tm_supply", name: "Supply Chain Lead", position: "Supply Chain", departmentId: "dep_logistics", managerId: "tm_ceo" },
-  { id: "tm_elias", name: "Elias", position: "Warehouse Rep", departmentId: "dep_logistics", managerId: "tm_supply" },
-  { id: "tm_heidy", name: "Heidy", position: "Warehouse Rep", departmentId: "dep_logistics", managerId: "tm_supply" },
-  { id: "tm_miet", name: "Miet", position: "Warehouse Rep", departmentId: "dep_logistics", managerId: "tm_supply" },
+  // Logistics → Supply Chain / Fulfillment
+  { id: "tm_supply", name: "Supply Chain Lead", position: "Supply Chain", departmentId: "dep_supply", managerId: "tm_ceo" },
+  { id: "tm_elias", name: "Elias", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerId: "tm_supply" },
+  { id: "tm_heidy", name: "Heidy", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerId: "tm_supply" },
+  { id: "tm_miet", name: "Miet", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerId: "tm_supply" },
 
   // CS
   { id: "tm_justine", name: "Justine", position: "CS Rep", departmentId: "dep_cs", managerId: "tm_ceo" },
