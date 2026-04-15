@@ -50,14 +50,17 @@ const departments: Department[] = [
 const team: TeamMember[] = [
   // Executive
   { id: "tm_jose", name: "Jose Lepage", position: "CEO", departmentId: "dep_exec" },
-  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Executive Assistant · Head of Supply Chain", departmentId: "dep_exec", managerId: "tm_jose" },
+  // Thaylu wears two hats: EA (Exec) + Head of Supply Chain (Logistics)
+  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Executive Assistant · Head of Supply Chain", departmentId: "dep_exec", additionalDepartmentIds: ["dep_supply"], managerId: "tm_jose" },
 
   // Finance
   { id: "tm_jaime", name: "Jaime Trujillo", position: "Fractional CFO", departmentId: "dep_finance", managerId: "tm_jose" },
-  { id: "tm_gyorgy", name: "Gyorgy Vagovits", position: "Finance Manager · Amazon / TTS / Walmart Manager", departmentId: "dep_finance", managerId: "tm_jaime" },
+  // Gyorgy: Finance primary + Amazon / TTS / Walmart on the side
+  { id: "tm_gyorgy", name: "Gyorgy Vagovits", position: "Finance Manager · Amazon / TTS / Walmart Manager", departmentId: "dep_finance", additionalDepartmentIds: ["dep_amazon", "dep_ttshop", "dep_marketplace"], managerId: "tm_jaime" },
 
   // Advertising
-  { id: "tm_damian", name: "Damian Perez", position: "Head of Advertising · AppLovin · LP Specialist", departmentId: "dep_advertising", managerId: "tm_jose" },
+  // Damian: Head of Advertising primary + AppLovin (Advertising) + LP Specialist (Website)
+  { id: "tm_damian", name: "Damian Perez", position: "Head of Advertising · AppLovin · LP Specialist", departmentId: "dep_advertising", additionalDepartmentIds: ["dep_lp"], managerId: "tm_jose" },
   { id: "tm_simona", name: "Simona Saule", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerId: "tm_damian" },
   { id: "tm_kristaps", name: "Kristaps Krauklis", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerId: "tm_damian" },
   { id: "tm_ivana", name: "Ivana Vitali", position: "Google & TikTok Media Buyer", departmentId: "dep_advertising", managerId: "tm_damian" },
@@ -71,7 +74,8 @@ const team: TeamMember[] = [
   { id: "tm_pedro", name: "Pedro Raze", position: "Video Editor", departmentId: "dep_creative", managerId: "tm_oli" },
   { id: "tm_paul", name: "Paul R.", position: "Video Editor", departmentId: "dep_creative", managerId: "tm_oli" },
   { id: "tm_winder", name: "Winder Buznego", position: "Graphic Designer", departmentId: "dep_creative", managerId: "tm_oli" },
-  { id: "tm_jesus_dw", name: "Jesus de Windt", position: "Content Strategist · Social Media Manager", departmentId: "dep_creative", managerId: "tm_jose" },
+  // Jesus de Windt: Content Strategist (Creative) + Social Media Manager (Organic)
+  { id: "tm_jesus_dw", name: "Jesus de Windt", position: "Content Strategist · Social Media Manager", departmentId: "dep_creative", additionalDepartmentIds: ["dep_organic"], managerId: "tm_jose" },
 
   // Organic & Retention
   { id: "tm_samra", name: "Samra Zuga", position: "Email & SMS Specialist", departmentId: "dep_organic", managerId: "tm_jose" },

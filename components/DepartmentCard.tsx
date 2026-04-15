@@ -9,7 +9,7 @@ import {
   statusLabel,
   statusSolid,
 } from "@/lib/format";
-import { aggregateDepartmentStats, childDepartments } from "@/lib/hierarchy";
+import { aggregateDepartmentStats, childDepartments, membersOfDepartment } from "@/lib/hierarchy";
 import { Avatar } from "./Avatar";
 
 export function DepartmentCard({
@@ -24,7 +24,7 @@ export function DepartmentCard({
   const fillColor = statusSolid(status);
   const head = state.team.find((m) => m.id === department.headId);
   const subs = childDepartments(state, department.id);
-  const directMembers = state.team.filter((t) => t.departmentId === department.id);
+  const directMembers = membersOfDepartment(state, department.id);
 
   return (
     <Link
@@ -44,7 +44,8 @@ export function DepartmentCard({
             {department.name}
           </h3>
           <div className="mt-1.5 font-numeric text-[11px] uppercase tracking-brand text-white/55">
-            {directMembers.length + subs.reduce((n, s) => n + state.team.filter((t) => t.departmentId === s.id).length, 0)}{" "}
+            {directMembers.length +
+              subs.reduce((n, s) => n + membersOfDepartment(state, s.id).length, 0)}{" "}
             people · {stats.count} KPI{stats.count === 1 ? "" : "s"}
             {subs.length > 0 && ` · ${subs.length} sub-depts`}
           </div>

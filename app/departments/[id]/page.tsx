@@ -16,6 +16,7 @@ import {
 import {
   aggregateDepartmentStats,
   childDepartments,
+  membersOfDepartment,
   targetsForDepartment,
 } from "@/lib/hierarchy";
 import { ArrowLeft, ChevronRight } from "lucide-react";
@@ -41,7 +42,7 @@ export default function DepartmentDetailPage() {
   const stats = aggregateDepartmentStats(state, id);
   const status = classifyStatus(stats.avgRatio);
   const head = state.team.find((m) => m.id === dept.headId);
-  const directMembers = state.team.filter((t) => t.departmentId === id);
+  const directMembers = membersOfDepartment(state, id);
   const ownTargets = targetsForDepartment(state, id);
 
   return (

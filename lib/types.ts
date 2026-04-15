@@ -53,7 +53,10 @@ export type TeamMember = {
   name: string;
   position: string;
   email?: string;
+  /** Primary "home" department (counts for headcount, manager chain, etc.) */
   departmentId: string;
+  /** Additional departments this person also belongs to (multi-hat roles) */
+  additionalDepartmentIds?: string[];
   /** Optional manager (used to propagate underperformance signals upward) */
   managerId?: string;
   avatarInitials?: string;

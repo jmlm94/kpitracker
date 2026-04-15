@@ -1,5 +1,20 @@
-import type { AppState, Department, Target } from "./types";
+import type { AppState, Department, Target, TeamMember } from "./types";
 import { classifyStatus, pickProgressValue, progressRatio } from "./format";
+
+/** Every department a person belongs to (primary first, then additional). */
+export function memberDepartmentIds(person: TeamMember): string[] {
+  return [person.departmentId, ...(person.additionalDepartmentIds || [])].filter(
+    (v, i, a) => v && a.indexOf(v) === i,
+  );
+}
+
+/** Members of a department — includes anyone for whom this dept is primary or additional. */
+export function membersOfDepartment(
+  state: AppState,
+  departmentId: string,
+): TeamMember[] {
+  return state.team.filter((m) => memberDepartmentIds(m).includes(departmentId));
+}
 
 /** Returns every descendant department id (inclusive of the root). */
 export function descendantDepartmentIds(state: AppState, rootId: string): string[] {
@@ -35,11 +50,13 @@ export function unassignedSubs(state: AppState): Department[] {
   );
 }
 
-/** All targets owned by people assigned to this department or any descendant. */
+/** All targets owned by people assigned (primarily or additionally) to this dept or descendants. */
 export function targetsForDepartment(state: AppState, departmentId: string): Target[] {
   const depIds = new Set(descendantDepartmentIds(state, departmentId));
   const memberIds = new Set(
-    state.team.filter((t) => depIds.has(t.departmentId)).map((m) => m.id),
+    state.team
+      .filter((t) => memberDepartmentIds(t).some((id) => depIds.has(id)))
+      .map((m) => m.id),
   );
   return state.targets.filter((t) => memberIds.has(t.ownerId));
 }
