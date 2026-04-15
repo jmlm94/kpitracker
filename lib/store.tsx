@@ -77,12 +77,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       upsertDepartment: (d) =>
         setState((s) => {
           const exists = s.departments.some((x) => x.id === d.id);
-          return {
-            ...s,
-            departments: exists
-              ? s.departments.map((x) => (x.id === d.id ? d : x))
-              : [...s.departments, d],
-          };
+          const nextDepts = exists
+            ? s.departments.map((x) => (x.id === d.id ? d : x))
+            : [...s.departments, d];
+          // Whenever a head is set, make sure they're a member of this
+          // department — otherwise changes in Step 1 wouldn't show up in
+          // Step 2 / 3, which confused users.
+          let nextTeam = s.team;
+          if (d.headId) {
+            const person = s.team.find((t) => t.id === d.headId);
+            if (person) {
+              const current = [
+                person.departmentId,
+                ...(person.additionalDepartmentIds || []),
+              ];
+              if (!current.includes(d.id)) {
+                const updated = {
+                  ...person,
+                  additionalDepartmentIds: [
+                    ...(person.additionalDepartmentIds || []),
+                    d.id,
+                  ],
+                };
+                nextTeam = s.team.map((t) => (t.id === person.id ? updated : t));
+              }
+            }
+          }
+          return { ...s, departments: nextDepts, team: nextTeam };
         }),
       removeDepartment: (id) =>
         setState((s) => ({ ...s, departments: s.departments.filter((d) => d.id !== id) })),

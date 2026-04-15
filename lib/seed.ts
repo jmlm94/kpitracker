@@ -49,18 +49,18 @@ const departments: Department[] = [
 
 const team: TeamMember[] = [
   // Executive
-  { id: "tm_jose", name: "Jose Lepage", position: "CEO", departmentId: "dep_exec" },
+  { id: "tm_jose", name: "Jose Lepage", position: "CEO", departmentId: "dep_exec", additionalDepartmentIds: ["dep_marketing", "dep_team_success"] },
   // Thaylu wears two hats: EA (Exec) + Head of Supply Chain (Logistics)
-  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Executive Assistant · Head of Supply Chain", departmentId: "dep_exec", additionalDepartmentIds: ["dep_supply"], managerId: "tm_jose" },
+  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Executive Assistant · Head of Supply Chain", departmentId: "dep_exec", additionalDepartmentIds: ["dep_logistics", "dep_supply"], managerId: "tm_jose" },
 
   // Finance
   { id: "tm_jaime", name: "Jaime Trujillo", position: "Fractional CFO", departmentId: "dep_finance", managerId: "tm_jose" },
-  // Gyorgy: Finance primary + Amazon / TTS / Walmart on the side
-  { id: "tm_gyorgy", name: "Gyorgy Vagovits", position: "Finance Manager · Amazon / TTS / Walmart Manager", departmentId: "dep_finance", additionalDepartmentIds: ["dep_amazon", "dep_ttshop", "dep_marketplace"], managerId: "tm_jaime" },
+  // Gyorgy: Finance primary + Other Channels (main + 3 subs)
+  { id: "tm_gyorgy", name: "Gyorgy Vagovits", position: "Finance Manager · Amazon / TTS / Walmart Manager", departmentId: "dep_finance", additionalDepartmentIds: ["dep_channels", "dep_amazon", "dep_ttshop", "dep_marketplace"], managerId: "tm_jaime" },
 
   // Advertising
-  // Damian: Head of Advertising primary + AppLovin (Advertising) + LP Specialist (Website)
-  { id: "tm_damian", name: "Damian Perez", position: "Head of Advertising · AppLovin · LP Specialist", departmentId: "dep_advertising", additionalDepartmentIds: ["dep_lp"], managerId: "tm_jose" },
+  // Damian: Head of Advertising primary + AppLovin (Advertising) + LP Specialist (Website main + LP sub)
+  { id: "tm_damian", name: "Damian Perez", position: "Head of Advertising · AppLovin · LP Specialist", departmentId: "dep_advertising", additionalDepartmentIds: ["dep_website", "dep_lp"], managerId: "tm_jose" },
   { id: "tm_simona", name: "Simona Saule", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerId: "tm_damian" },
   { id: "tm_kristaps", name: "Kristaps Krauklis", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerId: "tm_damian" },
   { id: "tm_ivana", name: "Ivana Vitali", position: "Google & TikTok Media Buyer", departmentId: "dep_advertising", managerId: "tm_damian" },
@@ -81,8 +81,8 @@ const team: TeamMember[] = [
   { id: "tm_samra", name: "Samra Zuga", position: "Email & SMS Specialist", departmentId: "dep_organic", managerId: "tm_jose" },
   { id: "tm_sharon", name: "Sharon", position: "Copywriter", departmentId: "dep_organic", managerId: "tm_samra" },
 
-  // Customer Success
-  { id: "tm_doralee", name: "Doralee Clemente", position: "Head of Customer Success", departmentId: "dep_cs", managerId: "tm_jose" },
+  // Customer Success — Doralee is head of both the Experience parent and the CS sub
+  { id: "tm_doralee", name: "Doralee Clemente", position: "Head of Customer Success", departmentId: "dep_cs", additionalDepartmentIds: ["dep_experience"], managerId: "tm_jose" },
   { id: "tm_justine", name: "Justine Formacion", position: "CS Rep", departmentId: "dep_cs", managerId: "tm_doralee" },
   { id: "tm_juan", name: "Juan Urena", position: "CS Rep", departmentId: "dep_cs", managerId: "tm_doralee" },
   { id: "tm_felipe", name: "Felipe Osorio", position: "CS Rep", departmentId: "dep_cs", managerId: "tm_doralee" },
