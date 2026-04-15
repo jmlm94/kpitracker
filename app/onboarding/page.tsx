@@ -16,6 +16,8 @@ import {
   Users,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { Avatar } from "@/components/Avatar";
+import { presetsForPosition, type KPIPreset } from "@/lib/presets";
 import type {
   Department,
   KPI,
@@ -597,6 +599,12 @@ function isDescendantOf(
 
 /* ------------ STEP 2 ------------ */
 
+/**
+ * Team grid step — one card per person showing their roles. Each card
+ * supports inline name / position editing, multi-department membership
+ * (primary + additional with chips), manager assignment, and removal.
+ * A trailing "+ New team member" tile creates an empty card you can fill in.
+ */
 function TeamStep({
   state,
   upsert,
@@ -606,111 +614,210 @@ function TeamStep({
   upsert: (m: TeamMember) => void;
   remove: (id: string) => void;
 }) {
-  const [form, setForm] = useState<Partial<TeamMember>>({
-    departmentId: state.departments[0]?.id,
-  });
-
-  function add() {
-    if (!form.name || !form.position || !form.departmentId) return;
+  function addEmpty() {
     upsert({
       id: "tm_" + Math.random().toString(36).slice(2, 8),
-      name: form.name,
-      position: form.position,
-      departmentId: form.departmentId,
-      managerId: form.managerId,
-      email: form.email,
+      name: "New Team Member",
+      position: "Position / Role",
+      departmentId: state.departments[0]?.id,
     });
-    setForm({ departmentId: state.departments[0]?.id });
   }
 
   return (
-    <div className="card p-5">
-      <h2 className="section-title">Team members</h2>
-      <p className="text-sm text-white/50">
-        Add the people whose KPIs you want to track. You can assign a manager so
-        underperformance rolls up to their lead.
-      </p>
-
-      <div className="mt-5 divide-y divide-white/5 rounded-xl border border-white/5">
-        {state.team.map((m) => {
-          const dept = state.departments.find((d) => d.id === m.departmentId);
-          return (
-            <div key={m.id} className="grid grid-cols-12 items-center gap-3 p-3">
-              <input
-                defaultValue={m.name}
-                onBlur={(e) => upsert({ ...m, name: e.target.value })}
-                className="input col-span-3"
-              />
-              <input
-                defaultValue={m.position}
-                onBlur={(e) => upsert({ ...m, position: e.target.value })}
-                className="input col-span-3"
-                placeholder="Position"
-              />
-              <select
-                value={m.departmentId}
-                onChange={(e) => upsert({ ...m, departmentId: e.target.value })}
-                className="input col-span-2"
-              >
-                {state.departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={m.managerId || ""}
-                onChange={(e) =>
-                  upsert({ ...m, managerId: e.target.value || undefined })
-                }
-                className="input col-span-3"
-              >
-                <option value="">No manager</option>
-                {state.team
-                  .filter((t) => t.id !== m.id)
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-              </select>
-              <button onClick={() => remove(m.id)} className="btn-ghost col-span-1 justify-center">
-                <Trash2 size={14} />
-              </button>
-              <div className="col-span-12 -mt-1 text-[11px] text-white/40">
-                {dept?.name}
-                {m.email ? ` · ${m.email}` : ""}
-              </div>
-            </div>
-          );
-        })}
+    <div className="space-y-4">
+      <div className="card p-5">
+        <h2 className="section-title">Team members</h2>
+        <p className="mt-1 text-sm text-white/50">
+          One card per person. Confirm each name and role here. People with more
+          than one role get multiple department chips — click <b className="text-white">+ Add</b> to
+          give them a second hat.
+        </p>
       </div>
 
-      <div className="mt-5 grid grid-cols-12 items-end gap-3">
-        <div className="col-span-3">
-          <label className="label">Name</label>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {state.team.map((m) => (
+          <PersonCard key={m.id} person={m} state={state} upsert={upsert} remove={remove} />
+        ))}
+        {/* Add new tile */}
+        <button
+          onClick={addEmpty}
+          className="card flex min-h-[200px] flex-col items-center justify-center gap-2 border-dashed text-white/50 transition hover:border-carbinox hover:text-carbinox"
+        >
+          <Plus size={20} />
+          <span className="font-heading text-[12px] font-semibold uppercase tracking-brand">
+            New Team Member
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PersonCard({
+  person,
+  state,
+  upsert,
+  remove,
+}: {
+  person: TeamMember;
+  state: ReturnType<typeof useStore>["state"];
+  upsert: (m: TeamMember) => void;
+  remove: (id: string) => void;
+}) {
+  const primaryDept = state.departments.find((d) => d.id === person.departmentId);
+  const additional = (person.additionalDepartmentIds || [])
+    .map((id) => state.departments.find((d) => d.id === id))
+    .filter((d): d is Department => !!d);
+  const accent = primaryDept?.color || "#f8c808";
+  const allDepts = [primaryDept, ...additional].filter((d): d is Department => !!d);
+
+  // Possible departments the user could add (everything they're not already in)
+  const memberInIds = new Set(allDepts.map((d) => d.id));
+  const addable = state.departments.filter((d) => !memberInIds.has(d.id));
+
+  const [showAddDept, setShowAddDept] = useState(false);
+
+  return (
+    <div className="card relative p-4">
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[2px]"
+        style={{ background: accent }}
+      />
+      <div className="flex items-start gap-3">
+        <Avatar name={person.name || "?"} size={44} color={accent} />
+        <div className="min-w-0 flex-1">
           <input
-            className="input"
-            value={form.name || ""}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Simona Saule"
+            defaultValue={person.name}
+            onBlur={(e) => upsert({ ...person, name: e.target.value })}
+            placeholder="First Last"
+            className="w-full bg-transparent font-display text-xl font-extrabold uppercase leading-none tracking-brand text-white outline-none placeholder:text-white/30"
+          />
+          <input
+            defaultValue={person.position}
+            onBlur={(e) => upsert({ ...person, position: e.target.value })}
+            placeholder="Role / position"
+            className="mt-1 w-full bg-transparent text-[12px] text-white/60 outline-none placeholder:text-white/30"
           />
         </div>
-        <div className="col-span-3">
-          <label className="label">Position</label>
-          <input
-            className="input"
-            value={form.position || ""}
-            onChange={(e) => setForm({ ...form, position: e.target.value })}
-            placeholder="Media Buyer - Meta"
-          />
+        <button
+          onClick={() => {
+            if (confirm(`Remove ${person.name} from the org?`)) remove(person.id);
+          }}
+          className="text-white/30 hover:text-bad"
+          title="Remove person"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {/* Roles / dept chips */}
+      <div className="mt-4">
+        <div className="bracket">Roles ({allDepts.length})</div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {allDepts.map((d, idx) => {
+            const isPrimary = idx === 0;
+            return (
+              <span
+                key={d.id}
+                className={cx(
+                  "inline-flex items-center gap-1.5 border px-2 py-1 text-[11px] font-heading font-semibold uppercase tracking-brand",
+                  isPrimary ? "" : "border-dashed",
+                )}
+                style={{
+                  borderColor: d.color,
+                  color: "#fff",
+                  background: `${d.color}10`,
+                }}
+              >
+                <span className="h-1.5 w-1.5" style={{ background: d.color }} />
+                {d.name}
+                {isPrimary && (
+                  <span className="font-numeric text-[9px] text-carbinox">★ primary</span>
+                )}
+                {!isPrimary && (
+                  <button
+                    onClick={() =>
+                      upsert({
+                        ...person,
+                        additionalDepartmentIds: (person.additionalDepartmentIds || []).filter(
+                          (id) => id !== d.id,
+                        ),
+                      })
+                    }
+                    className="text-white/40 hover:text-bad"
+                    title="Remove this role"
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            );
+          })}
+          {addable.length > 0 && !showAddDept && (
+            <button
+              onClick={() => setShowAddDept(true)}
+              className="inline-flex items-center gap-1 border border-dashed border-white/20 bg-white/[0.02] px-2 py-1 text-[11px] font-heading font-semibold uppercase tracking-brand text-white/60 hover:border-carbinox hover:text-carbinox"
+            >
+              <Plus size={10} /> Add role
+            </button>
+          )}
+          {showAddDept && addable.length > 0 && (
+            <select
+              autoFocus
+              defaultValue=""
+              onChange={(e) => {
+                const id = e.target.value;
+                if (!id) return;
+                upsert({
+                  ...person,
+                  additionalDepartmentIds: [
+                    ...(person.additionalDepartmentIds || []),
+                    id,
+                  ],
+                });
+                setShowAddDept(false);
+              }}
+              onBlur={() => setShowAddDept(false)}
+              className="input w-auto py-1 text-xs"
+            >
+              <option value="">Pick a department…</option>
+              {addable.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
-        <div className="col-span-2">
-          <label className="label">Department</label>
+      </div>
+
+      {/* Primary dept selector + manager */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div>
+          <label className="label">Primary dept</label>
           <select
-            className="input"
-            value={form.departmentId || ""}
-            onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
+            value={person.departmentId}
+            onChange={(e) => {
+              const newPrimary = e.target.value;
+              const additionals = (person.additionalDepartmentIds || []).filter(
+                (id) => id !== newPrimary,
+              );
+              // If the old primary isn't yet in additionals (and isn't the same), keep it as additional
+              const keepOld =
+                person.departmentId &&
+                person.departmentId !== newPrimary &&
+                !additionals.includes(person.departmentId);
+              const next = keepOld
+                ? [person.departmentId, ...additionals]
+                : additionals;
+              upsert({
+                ...person,
+                departmentId: newPrimary,
+                additionalDepartmentIds: next.length ? next : undefined,
+              });
+            }}
+            className="input py-1.5 text-xs"
           >
             {state.departments.map((d) => (
               <option key={d.id} value={d.id}>
@@ -719,24 +826,25 @@ function TeamStep({
             ))}
           </select>
         </div>
-        <div className="col-span-3">
+        <div>
           <label className="label">Reports to</label>
           <select
-            className="input"
-            value={form.managerId || ""}
-            onChange={(e) => setForm({ ...form, managerId: e.target.value || undefined })}
+            value={person.managerId || ""}
+            onChange={(e) =>
+              upsert({ ...person, managerId: e.target.value || undefined })
+            }
+            className="input py-1.5 text-xs"
           >
-            <option value="">—</option>
-            {state.team.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
+            <option value="">No manager</option>
+            {state.team
+              .filter((t) => t.id !== person.id)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
           </select>
         </div>
-        <button className="btn-primary col-span-1 justify-center" onClick={add}>
-          <Plus size={14} />
-        </button>
       </div>
     </div>
   );
@@ -744,6 +852,12 @@ function TeamStep({
 
 /* ------------ STEP 3 ------------ */
 
+/**
+ * KPIs grid step — one card per person, listing every KPI they own with
+ * inline editing of Name · Unit · Target · Source. New KPIs can be added
+ * from a "Suggested for this role" preset list (auto-derived from the
+ * person's position) or from scratch.
+ */
 function KPIsStep({
   state,
   upsertKpi,
@@ -757,249 +871,300 @@ function KPIsStep({
   upsertTarget: (t: Target) => void;
   removeTarget: (id: string) => void;
 }) {
-  const [kpi, setKpi] = useState<Partial<KPI>>({
-    unit: "number",
-    direction: "higher_is_better",
-    provider: "manual",
-    window: "mtd",
-  });
-  const [target, setTarget] = useState<Partial<Target>>({
-    period: "monthly",
-    periodKey: new Date().toISOString().slice(0, 7),
-  });
+  return (
+    <div className="space-y-4">
+      <div className="card p-5">
+        <h2 className="section-title">KPIs by person</h2>
+        <p className="mt-1 text-sm text-white/50">
+          Confirm the KPIs each team member owns. Each KPI has{" "}
+          <b className="text-white">Name · Unit · Target · Source</b>. Pre-seeded
+          KPIs are already filled in based on each role — keep them, edit them,
+          or add new ones from the <b className="text-white">Suggested</b> menu
+          per card.
+        </p>
+      </div>
 
-  function add() {
-    if (!kpi.name || !kpi.metricKey || !target.ownerId || !target.target) return;
-    const id = "kpi_" + Math.random().toString(36).slice(2, 8);
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {state.team.map((person) => (
+          <KPIPersonCard
+            key={person.id}
+            person={person}
+            state={state}
+            upsertKpi={upsertKpi}
+            removeKpi={removeKpi}
+            upsertTarget={upsertTarget}
+            removeTarget={removeTarget}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function KPIPersonCard({
+  person,
+  state,
+  upsertKpi,
+  removeKpi,
+  upsertTarget,
+  removeTarget,
+}: {
+  person: TeamMember;
+  state: ReturnType<typeof useStore>["state"];
+  upsertKpi: (k: KPI) => void;
+  removeKpi: (id: string) => void;
+  upsertTarget: (t: Target) => void;
+  removeTarget: (id: string) => void;
+}) {
+  const primaryDept = state.departments.find((d) => d.id === person.departmentId);
+  const accent = primaryDept?.color || "#f8c808";
+  const additional = (person.additionalDepartmentIds || [])
+    .map((id) => state.departments.find((d) => d.id === id))
+    .filter((d): d is Department => !!d);
+  const allDepts = [primaryDept, ...additional].filter((d): d is Department => !!d);
+
+  // Targets owned by this person
+  const ownedTargets = state.targets.filter((t) => t.ownerId === person.id);
+  const presets = presetsForPosition(person.position);
+
+  function addCustomKPI() {
+    const kpiId = "kpi_" + Math.random().toString(36).slice(2, 8);
     const tid = "t_" + Math.random().toString(36).slice(2, 8);
     upsertKpi({
-      id,
-      name: kpi.name,
-      description: kpi.description,
-      metricKey: kpi.metricKey,
-      unit: kpi.unit as Unit,
-      direction: kpi.direction as KPI["direction"],
-      provider: kpi.provider as Provider,
-      window: (kpi.window as KPI["window"]) || "mtd",
-    });
-    upsertTarget({
-      id: tid,
-      kpiId: id,
-      ownerId: target.ownerId,
-      target: Number(target.target),
-      period: (target.period as Target["period"]) || "monthly",
-      periodKey: target.periodKey || new Date().toISOString().slice(0, 7),
-    });
-    setKpi({
+      id: kpiId,
+      name: "New KPI",
       unit: "number",
       direction: "higher_is_better",
       provider: "manual",
+      metricKey: "custom." + kpiId,
       window: "mtd",
     });
-    setTarget({ period: "monthly", periodKey: new Date().toISOString().slice(0, 7) });
+    upsertTarget({
+      id: tid,
+      kpiId,
+      ownerId: person.id,
+      target: 100,
+      period: "monthly",
+      periodKey: new Date().toISOString().slice(0, 7),
+    });
+  }
+
+  function addFromPreset(p: KPIPreset) {
+    const kpiId = "kpi_" + Math.random().toString(36).slice(2, 8);
+    const tid = "t_" + Math.random().toString(36).slice(2, 8);
+    upsertKpi({
+      id: kpiId,
+      name: p.name,
+      description: p.description,
+      unit: p.unit,
+      direction: p.direction,
+      provider: p.provider,
+      metricKey: p.metricKey,
+      window: p.window,
+    });
+    upsertTarget({
+      id: tid,
+      kpiId,
+      ownerId: person.id,
+      target: p.target,
+      period: "monthly",
+      periodKey: new Date().toISOString().slice(0, 7),
+    });
   }
 
   return (
-    <div className="space-y-6">
-      <div className="card p-5">
-        <h2 className="section-title">Existing KPIs</h2>
-        <div className="mt-4 divide-y divide-white/5 rounded-xl border border-white/5">
-          {state.kpis.map((k) => {
-            const targets = state.targets.filter((t) => t.kpiId === k.id);
-            return (
-              <div key={k.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-white">{k.name}</div>
-                    <div className="text-xs text-white/50">
-                      {k.provider} · {k.metricKey} · {k.window} ·{" "}
-                      {k.direction === "higher_is_better" ? "↑ better" : "↓ better"}
-                    </div>
-                  </div>
-                  <button onClick={() => removeKpi(k.id)} className="btn-ghost">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                  {targets.map((t) => {
-                    const owner = state.team.find((m) => m.id === t.ownerId);
-                    return (
-                      <div
-                        key={t.id}
-                        className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-2.5 text-sm"
-                      >
-                        <div>
-                          <div className="text-white">
-                            Target {t.target}{" "}
-                            <span className="text-white/40">
-                              · {t.period} · {t.periodKey}
-                            </span>
-                          </div>
-                          <div className="text-xs text-white/50">
-                            Owner: {owner?.name || "—"}
-                          </div>
-                        </div>
-                        <button onClick={() => removeTarget(t.id)} className="btn-ghost">
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-          {state.kpis.length === 0 && (
-            <div className="p-4 text-sm text-white/50">No KPIs yet — add one below.</div>
-          )}
+    <div className="card relative p-4">
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[2px]"
+        style={{ background: accent }}
+      />
+
+      {/* Person header */}
+      <div className="flex items-start gap-3">
+        <Avatar name={person.name} size={40} color={accent} />
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-xl font-extrabold uppercase leading-none tracking-brand text-white">
+            {person.name}
+          </div>
+          <div className="mt-1 text-[12px] text-white/55">{person.position}</div>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {allDepts.map((d) => (
+              <span
+                key={d.id}
+                className="inline-flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-heading font-semibold uppercase tracking-brand"
+                style={{ borderColor: `${d.color}80`, color: "#fff" }}
+              >
+                <span className="h-1 w-1" style={{ background: d.color }} />
+                {d.name}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="card p-5">
-        <h2 className="section-title">Add a new KPI + target</h2>
-        <div className="mt-5 grid grid-cols-12 gap-3">
-          <div className="col-span-4">
-            <label className="label">KPI name</label>
-            <input
-              className="input"
-              placeholder="e.g. Meta ROAS"
-              value={kpi.name || ""}
-              onChange={(e) => setKpi({ ...kpi, name: e.target.value })}
+      {/* KPI rows */}
+      <div className="mt-4 space-y-2">
+        {ownedTargets.length === 0 && (
+          <div className="border border-dashed border-white/10 px-3 py-3 text-[12px] text-white/40">
+            No KPIs yet. Use a preset below or add a custom one.
+          </div>
+        )}
+        {ownedTargets.map((t) => {
+          const k = state.kpis.find((x) => x.id === t.kpiId);
+          if (!k) return null;
+          return (
+            <KPIRow
+              key={t.id}
+              kpi={k}
+              target={t}
+              upsertKpi={upsertKpi}
+              upsertTarget={upsertTarget}
+              onRemove={() => {
+                removeTarget(t.id);
+                // If this KPI has no other targets, remove the KPI definition too
+                const others = state.targets.filter(
+                  (other) => other.kpiId === k.id && other.id !== t.id,
+                );
+                if (others.length === 0) removeKpi(k.id);
+              }}
             />
-          </div>
-          <div className="col-span-4">
-            <label className="label">Data source</label>
-            <select
-              className="input"
-              value={kpi.provider}
-              onChange={(e) => setKpi({ ...kpi, provider: e.target.value as Provider })}
-            >
-              {providerOptions.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-4">
-            <label className="label">Metric key</label>
-            <input
-              className="input"
-              placeholder="e.g. meta.roas"
-              value={kpi.metricKey || ""}
-              onChange={(e) => setKpi({ ...kpi, metricKey: e.target.value })}
-            />
-          </div>
+          );
+        })}
+      </div>
 
-          <div className="col-span-3">
-            <label className="label">Unit</label>
-            <select
-              className="input"
-              value={kpi.unit}
-              onChange={(e) => setKpi({ ...kpi, unit: e.target.value as Unit })}
-            >
-              {unitOptions.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
+      {/* Add KPI controls */}
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
+        {presets.length > 0 && (
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              const idx = Number(e.target.value);
+              if (!Number.isFinite(idx) || idx < 0) return;
+              addFromPreset(presets[idx]);
+              e.currentTarget.value = "";
+            }}
+            className="input w-auto py-1.5 text-xs"
+            title="Suggested KPIs based on this person's position"
+          >
+            <option value="">+ Add suggested KPI…</option>
+            {presets
+              .filter(
+                // hide presets that are already attached to this person
+                (p) =>
+                  !ownedTargets.some((t) => {
+                    const k = state.kpis.find((x) => x.id === t.kpiId);
+                    return k?.metricKey === p.metricKey && k?.name === p.name;
+                  }),
+              )
+              .map((p, i) => (
+                <option key={p.name + p.metricKey} value={presets.indexOf(p)}>
+                  {p.name} · target {p.target}
                 </option>
               ))}
-            </select>
-          </div>
-          <div className="col-span-3">
-            <label className="label">Direction</label>
-            <select
-              className="input"
-              value={kpi.direction}
-              onChange={(e) =>
-                setKpi({ ...kpi, direction: e.target.value as KPI["direction"] })
-              }
-            >
-              <option value="higher_is_better">Higher is better</option>
-              <option value="lower_is_better">Lower is better</option>
-            </select>
-          </div>
-          <div className="col-span-3">
-            <label className="label">Window</label>
-            <select
-              className="input"
-              value={kpi.window}
-              onChange={(e) =>
-                setKpi({ ...kpi, window: e.target.value as KPI["window"] })
-              }
-            >
-              <option value="today">Today</option>
-              <option value="7d">Last 7 days</option>
-              <option value="mtd">Month-to-date</option>
-              <option value="30d">Last 30 days</option>
-            </select>
-          </div>
-          <div className="col-span-3">
-            <label className="label">Description</label>
-            <input
-              className="input"
-              placeholder="Optional"
-              value={kpi.description || ""}
-              onChange={(e) => setKpi({ ...kpi, description: e.target.value })}
-            />
-          </div>
+          </select>
+        )}
+        <button onClick={addCustomKPI} className="btn-ghost">
+          <Plus size={12} /> Custom KPI
+        </button>
+      </div>
+    </div>
+  );
+}
 
-          <div className="col-span-4">
-            <label className="label">Target value</label>
-            <input
-              className="input"
-              type="number"
-              step="any"
-              placeholder="1.6"
-              value={(target.target as number) ?? ""}
-              onChange={(e) =>
-                setTarget({ ...target, target: Number(e.target.value) })
-              }
-            />
-          </div>
-          <div className="col-span-4">
-            <label className="label">Owner</label>
-            <select
-              className="input"
-              value={target.ownerId || ""}
-              onChange={(e) => setTarget({ ...target, ownerId: e.target.value })}
-            >
-              <option value="">Select team member</option>
-              {state.team.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} — {m.position}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-2">
-            <label className="label">Period</label>
-            <select
-              className="input"
-              value={target.period}
-              onChange={(e) =>
-                setTarget({ ...target, period: e.target.value as Target["period"] })
-              }
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-          </div>
-          <div className="col-span-2">
-            <label className="label">Period key</label>
-            <input
-              className="input"
-              placeholder="2026-04"
-              value={target.periodKey || ""}
-              onChange={(e) => setTarget({ ...target, periodKey: e.target.value })}
-            />
-          </div>
-        </div>
-        <div className="mt-5 flex justify-end">
-          <button onClick={add} className="btn-primary">
-            <Plus size={14} /> Add KPI + target
-          </button>
-        </div>
+function KPIRow({
+  kpi,
+  target,
+  upsertKpi,
+  upsertTarget,
+  onRemove,
+}: {
+  kpi: KPI;
+  target: Target;
+  upsertKpi: (k: KPI) => void;
+  upsertTarget: (t: Target) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-12 items-center gap-1.5 border border-white/10 bg-jet-900 p-2">
+      <input
+        defaultValue={kpi.name}
+        onBlur={(e) => upsertKpi({ ...kpi, name: e.target.value })}
+        className="col-span-4 bg-transparent font-heading text-[12px] font-semibold uppercase tracking-brand text-white outline-none"
+        placeholder="KPI name"
+      />
+      <select
+        value={kpi.unit}
+        onChange={(e) => upsertKpi({ ...kpi, unit: e.target.value as Unit })}
+        className="input col-span-2 px-1.5 py-1 text-[11px]"
+      >
+        {unitOptions.map((u) => (
+          <option key={u.value} value={u.value}>
+            {u.label}
+          </option>
+        ))}
+      </select>
+      <input
+        type="number"
+        step="any"
+        defaultValue={target.target}
+        onBlur={(e) =>
+          upsertTarget({ ...target, target: Number(e.target.value) })
+        }
+        className="input col-span-2 px-1.5 py-1 text-right font-numeric text-[12px]"
+        placeholder="Target"
+      />
+      <select
+        value={kpi.provider}
+        onChange={(e) => upsertKpi({ ...kpi, provider: e.target.value as Provider })}
+        className="input col-span-3 px-1.5 py-1 text-[11px]"
+        title="Where to measure it"
+      >
+        {providerOptions.map((p) => (
+          <option key={p.value} value={p.value}>
+            {p.label}
+          </option>
+        ))}
+      </select>
+      <button
+        onClick={onRemove}
+        className="col-span-1 justify-self-end text-white/30 hover:text-bad"
+        title="Remove KPI"
+      >
+        <Trash2 size={12} />
+      </button>
+      {/* Second row: direction + window + metric key, dimmer */}
+      <div className="col-span-12 mt-1 flex flex-wrap items-center gap-2 text-[10px] text-white/45">
+        <span className="bracket">Direction</span>
+        <select
+          value={kpi.direction}
+          onChange={(e) =>
+            upsertKpi({ ...kpi, direction: e.target.value as KPI["direction"] })
+          }
+          className="bg-transparent text-white/70 outline-none"
+        >
+          <option value="higher_is_better">↑ Higher is better</option>
+          <option value="lower_is_better">↓ Lower is better</option>
+        </select>
+        <span className="bracket ml-2">Window</span>
+        <select
+          value={kpi.window}
+          onChange={(e) =>
+            upsertKpi({ ...kpi, window: e.target.value as KPI["window"] })
+          }
+          className="bg-transparent text-white/70 outline-none"
+        >
+          <option value="today">Today</option>
+          <option value="7d">Last 7 days</option>
+          <option value="mtd">Month-to-date</option>
+          <option value="30d">Last 30 days</option>
+        </select>
+        <span className="bracket ml-2">Metric key</span>
+        <input
+          defaultValue={kpi.metricKey}
+          onBlur={(e) => upsertKpi({ ...kpi, metricKey: e.target.value })}
+          className="min-w-0 flex-1 bg-transparent font-numeric text-white/70 outline-none"
+        />
       </div>
     </div>
   );
