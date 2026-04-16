@@ -57,7 +57,9 @@ export type TeamMember = {
   departmentId: string;
   /** Additional departments this person also belongs to (multi-hat roles) */
   additionalDepartmentIds?: string[];
-  /** Optional manager (used to propagate underperformance signals upward) */
+  /** Direct managers — a person can have more than one (e.g. shared resources) */
+  managerIds?: string[];
+  /** @deprecated kept only for migration; use managerIds */
   managerId?: string;
   avatarInitials?: string;
 };

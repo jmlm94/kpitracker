@@ -18,7 +18,7 @@ const departments: Department[] = [
   // Main departments
   { id: "dep_exec", name: "Executive", color: "#f8f8f8", kind: "main", headId: "tm_jose" },
   { id: "dep_marketing", name: "Marketing", color: "#f8c808", kind: "main", headId: "tm_jose" },
-  { id: "dep_experience", name: "Experience", color: "#ffd833", kind: "main", headId: "tm_doralee" },
+  { id: "dep_experience", name: "Experience", color: "#ffd833", kind: "main", headId: "tm_thaylu" },
   { id: "dep_website", name: "Website", color: "#48f088", kind: "main", headId: "tm_damian" },
   { id: "dep_channels", name: "Other Channels", color: "#d0f800", kind: "main", headId: "tm_gyorgy" },
   { id: "dep_logistics", name: "Logistics", color: "#408038", kind: "main", headId: "tm_thaylu" },
@@ -26,12 +26,12 @@ const departments: Department[] = [
 
   // Marketing sub-departments
   { id: "dep_advertising", name: "Advertising", color: "#f06020", kind: "sub", parentId: "dep_marketing", headId: "tm_damian" },
-  { id: "dep_creative", name: "Creative", color: "#e83028", kind: "sub", parentId: "dep_marketing", headId: "tm_oli" },
-  { id: "dep_organic", name: "Organic & Retention", color: "#10a0f8", kind: "sub", parentId: "dep_marketing", headId: "tm_samra" },
+  { id: "dep_creative", name: "Creative", color: "#e83028", kind: "sub", parentId: "dep_marketing", headId: "tm_jose" },
+  { id: "dep_organic", name: "Organic & Retention", color: "#10a0f8", kind: "sub", parentId: "dep_marketing", headId: "tm_jose" },
 
   // Experience sub-departments
   { id: "dep_cs", name: "Customer Success", color: "#ffd833", kind: "sub", parentId: "dep_experience", headId: "tm_doralee" },
-  { id: "dep_team_success", name: "Team Success", color: "#ff6b4a", kind: "sub", parentId: "dep_experience", headId: "tm_jose" },
+  { id: "dep_team_success", name: "Team Success", color: "#ff6b4a", kind: "sub", parentId: "dep_experience", headId: "tm_thaylu" },
 
   // Website sub-departments
   { id: "dep_lp", name: "Landing Pages", color: "#34d399", kind: "sub", parentId: "dep_website", headId: "tm_damian" },
@@ -49,54 +49,56 @@ const departments: Department[] = [
 
 const team: TeamMember[] = [
   // Executive
-  { id: "tm_jose", name: "Jose Lepage", position: "CEO", departmentId: "dep_exec", additionalDepartmentIds: ["dep_marketing", "dep_team_success"] },
-  // Thaylu wears two hats: EA (Exec) + Head of Supply Chain (Logistics)
-  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Executive Assistant · Head of Supply Chain", departmentId: "dep_exec", additionalDepartmentIds: ["dep_logistics", "dep_supply"], managerId: "tm_jose" },
+  { id: "tm_jose", name: "Jose Lepage", position: "CEO", departmentId: "dep_exec", additionalDepartmentIds: ["dep_marketing", "dep_creative", "dep_organic"] },
+  // Thaylu wears multiple hats: EA + Head of Experience + Head of Team Success + Head of Logistics + Head of Supply Chain
+  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Executive Assistant · Head of Experience · Logistics · Supply Chain", departmentId: "dep_exec", additionalDepartmentIds: ["dep_experience", "dep_team_success", "dep_logistics", "dep_supply"], managerIds: ["tm_jose"] },
 
   // Finance
-  { id: "tm_jaime", name: "Jaime Trujillo", position: "Fractional CFO", departmentId: "dep_finance", managerId: "tm_jose" },
+  { id: "tm_jaime", name: "Jaime Trujillo", position: "Fractional CFO", departmentId: "dep_finance", managerIds: ["tm_jose"] },
   // Gyorgy: Finance primary + Other Channels (main + 3 subs)
-  { id: "tm_gyorgy", name: "Gyorgy Vagovits", position: "Finance Manager · Amazon / TTS / Walmart Manager", departmentId: "dep_finance", additionalDepartmentIds: ["dep_channels", "dep_amazon", "dep_ttshop", "dep_marketplace"], managerId: "tm_jaime" },
+  { id: "tm_gyorgy", name: "Gyorgy Vagovits", position: "Finance Manager · Amazon / TTS / Walmart Manager", departmentId: "dep_finance", additionalDepartmentIds: ["dep_channels", "dep_amazon", "dep_ttshop", "dep_marketplace"], managerIds: ["tm_jaime"] },
 
   // Advertising
   // Damian: Head of Advertising primary + AppLovin (Advertising) + LP Specialist (Website main + LP sub)
-  { id: "tm_damian", name: "Damian Perez", position: "Head of Advertising · AppLovin · LP Specialist", departmentId: "dep_advertising", additionalDepartmentIds: ["dep_website", "dep_lp"], managerId: "tm_jose" },
-  { id: "tm_simona", name: "Simona Saule", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerId: "tm_damian" },
-  { id: "tm_kristaps", name: "Kristaps Krauklis", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerId: "tm_damian" },
-  { id: "tm_ivana", name: "Ivana Vitali", position: "Google & TikTok Media Buyer", departmentId: "dep_advertising", managerId: "tm_damian" },
+  { id: "tm_damian", name: "Damian Perez", position: "Head of Advertising · AppLovin · LP Specialist", departmentId: "dep_advertising", additionalDepartmentIds: ["dep_website", "dep_lp"], managerIds: ["tm_jose"] },
+  { id: "tm_simona", name: "Simona Saule", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
+  { id: "tm_kristaps", name: "Kristaps Krauklis", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
+  { id: "tm_ivana", name: "Ivana Vitali", position: "Google & TikTok Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
 
-  // Creative
-  { id: "tm_oli", name: "Oli Cimet", position: "Creative Strategist", departmentId: "dep_creative", managerId: "tm_jose" },
-  { id: "tm_malu", name: "Malu Celestino", position: "Creative Strategist", departmentId: "dep_creative", managerId: "tm_jose" },
-  { id: "tm_maria", name: "Maria Paula Dominguez", position: "Creative Strategist", departmentId: "dep_creative", managerId: "tm_jose" },
-  { id: "tm_dante", name: "Dante Vilar", position: "Video Editor", departmentId: "dep_creative", managerId: "tm_oli" },
-  { id: "tm_sami", name: "Sami Mughal", position: "Video Editor", departmentId: "dep_creative", managerId: "tm_oli" },
-  { id: "tm_pedro", name: "Pedro Raze", position: "Video Editor", departmentId: "dep_creative", managerId: "tm_oli" },
-  { id: "tm_paul", name: "Paul R.", position: "Video Editor", departmentId: "dep_creative", managerId: "tm_oli" },
-  { id: "tm_winder", name: "Winder Buznego", position: "Graphic Designer", departmentId: "dep_creative", managerId: "tm_oli" },
-  // Jesus de Windt: Content Strategist (Creative) + Social Media Manager (Organic)
-  { id: "tm_jesus_dw", name: "Jesus de Windt", position: "Content Strategist · Social Media Manager", departmentId: "dep_creative", additionalDepartmentIds: ["dep_organic"], managerId: "tm_jose" },
+  // Creative — Jose is the head; three Creative Strategists each lead their own pod
+  { id: "tm_oli", name: "Oli Cimet", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_jose"] },
+  { id: "tm_malu", name: "Malu Celestino", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_jose"] },
+  { id: "tm_maria", name: "Maria Paula Dominguez", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_jose"] },
+  // Dante: dual role (Video Editor + Creative Strategist), reports to Malu, has Sami under
+  { id: "tm_dante", name: "Dante Vilar", position: "Video Editor · Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_malu"] },
+  { id: "tm_sami", name: "Sami Mughal", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_dante"] },
+  { id: "tm_pedro", name: "Pedro Raze", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_maria"] },
+  { id: "tm_paul", name: "Paul R.", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_oli"] },
+  // Winder reports to Oli, Malu, AND Maria (shared graphic designer)
+  { id: "tm_winder", name: "Winder Buznego", position: "Graphic Designer", departmentId: "dep_creative", managerIds: ["tm_oli", "tm_malu", "tm_maria"] },
+  // Jesus de Windt: Content Strategist (Creative) + Social Media Manager (Organic). No reports.
+  { id: "tm_jesus_dw", name: "Jesus de Windt", position: "Content Strategist · Social Media Manager", departmentId: "dep_creative", additionalDepartmentIds: ["dep_organic"], managerIds: ["tm_jose"] },
 
-  // Organic & Retention
-  { id: "tm_samra", name: "Samra Zuga", position: "Email & SMS Specialist", departmentId: "dep_organic", managerId: "tm_jose" },
-  { id: "tm_sharon", name: "Sharon", position: "Copywriter", departmentId: "dep_organic", managerId: "tm_samra" },
+  // Organic & Retention — Jose is head
+  { id: "tm_samra", name: "Samra Zuga", position: "Email & SMS Specialist", departmentId: "dep_organic", managerIds: ["tm_jose"] },
+  { id: "tm_sharon", name: "Sharon", position: "Copywriter", departmentId: "dep_organic", managerIds: ["tm_samra"] },
 
-  // Customer Success — Doralee is head of both the Experience parent and the CS sub
-  { id: "tm_doralee", name: "Doralee Clemente", position: "Head of Customer Success", departmentId: "dep_cs", additionalDepartmentIds: ["dep_experience"], managerId: "tm_jose" },
-  { id: "tm_justine", name: "Justine Formacion", position: "CS Rep", departmentId: "dep_cs", managerId: "tm_doralee" },
-  { id: "tm_juan", name: "Juan Urena", position: "CS Rep", departmentId: "dep_cs", managerId: "tm_doralee" },
-  { id: "tm_felipe", name: "Felipe Osorio", position: "CS Rep", departmentId: "dep_cs", managerId: "tm_doralee" },
-  { id: "tm_anthony", name: "Anthony Burcac", position: "CS Rep", departmentId: "dep_cs", managerId: "tm_doralee" },
+  // Customer Success — Doralee leads CS; reports to Thaylu (head of Experience)
+  { id: "tm_doralee", name: "Doralee Clemente", position: "Head of Customer Success", departmentId: "dep_cs", managerIds: ["tm_thaylu"] },
+  { id: "tm_justine", name: "Justine Formacion", position: "CS Rep", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
+  { id: "tm_juan", name: "Juan Urena", position: "CS Rep", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
+  { id: "tm_felipe", name: "Felipe Osorio", position: "CS Rep", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
+  { id: "tm_anthony", name: "Anthony Burcac", position: "CS Rep", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
 
   // Website — LP (Damian above) + CRO
-  { id: "tm_jesus_m", name: "Jesus Mendoza", position: "CRO Specialist", departmentId: "dep_cro", managerId: "tm_jose" },
-  { id: "tm_mateo", name: "Mateo Costa", position: "CRO Specialist", departmentId: "dep_cro", managerId: "tm_jose" },
+  { id: "tm_jesus_m", name: "Jesus Mendoza", position: "CRO Specialist", departmentId: "dep_cro", managerIds: ["tm_jose"] },
+  { id: "tm_mateo", name: "Mateo Costa", position: "CRO Specialist", departmentId: "dep_cro", managerIds: ["tm_jose"] },
 
   // Logistics → Fulfillment
-  { id: "tm_evelyn", name: "Evelyn Marin", position: "Warehouse Manager", departmentId: "dep_fulfillment", managerId: "tm_thaylu" },
-  { id: "tm_heidi", name: "Heidi Aguilera", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerId: "tm_evelyn" },
-  { id: "tm_miet", name: "Miet Aguilera", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerId: "tm_evelyn" },
-  { id: "tm_jose_torres", name: "Jose Torres", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerId: "tm_evelyn" },
+  { id: "tm_evelyn", name: "Evelyn Marin", position: "Warehouse Manager", departmentId: "dep_fulfillment", managerIds: ["tm_thaylu"] },
+  { id: "tm_heidi", name: "Heidi Aguilera", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerIds: ["tm_evelyn"] },
+  { id: "tm_miet", name: "Miet Aguilera", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerIds: ["tm_evelyn"] },
+  { id: "tm_jose_torres", name: "Jose Torres", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerIds: ["tm_evelyn"] },
 ];
 
 type KpiSpec = KPI & {

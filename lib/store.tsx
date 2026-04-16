@@ -49,6 +49,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         parsed.departments = parsed.departments.map((d) =>
           (d as any).kind ? d : { ...d, kind: d.parentId ? "sub" : "main" },
         );
+        // Back-compat: older state had `managerId` (single). Migrate to managerIds[].
+        parsed.team = parsed.team.map((m) => {
+          if (m.managerIds || !m.managerId) return m;
+          return { ...m, managerIds: [m.managerId] };
+        });
         rawSetState(parsed);
       }
     } catch {

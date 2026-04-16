@@ -34,7 +34,14 @@ export default function TeamMemberPage() {
   const additionalDepts = (member.additionalDepartmentIds || [])
     .map((id) => state.departments.find((d) => d.id === id))
     .filter((d): d is NonNullable<typeof d> => !!d);
-  const manager = state.team.find((m) => m.id === member.managerId);
+  const managerIds = member.managerIds || (member.managerId ? [member.managerId] : []);
+  const managers = managerIds
+    .map((id) => state.team.find((m) => m.id === id))
+    .filter((m): m is NonNullable<typeof m> => !!m);
+  const directReports = state.team.filter((m) => {
+    const mids = m.managerIds || (m.managerId ? [m.managerId] : []);
+    return mids.includes(member.id);
+  });
   const targets = state.targets.filter((t) => t.ownerId === member.id);
   const watching = state.targets.filter((t) => t.watcherIds?.includes(member.id));
 
@@ -63,15 +70,26 @@ export default function TeamMemberPage() {
             </h1>
             <div className="mt-1 text-sm text-white/60">
               {member.position}
-              {manager && (
+              {managers.length > 0 && (
                 <>
                   {" · Reports to "}
-                  <Link
-                    href={`/team/${manager.id}`}
-                    className="text-white/80 hover:text-white"
-                  >
-                    {manager.name}
-                  </Link>
+                  {managers.map((m, i) => (
+                    <span key={m.id}>
+                      {i > 0 && ", "}
+                      <Link
+                        href={`/team/${m.id}`}
+                        className="text-white/80 hover:text-white"
+                      >
+                        {m.name}
+                      </Link>
+                    </span>
+                  ))}
+                </>
+              )}
+              {directReports.length > 0 && (
+                <>
+                  {" · Manages "}
+                  <span className="text-white/80">{directReports.length}</span>
                 </>
               )}
             </div>

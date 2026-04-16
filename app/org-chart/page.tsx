@@ -1,676 +1,302 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { Avatar } from "@/components/Avatar";
 import type { Department, TeamMember } from "@/lib/types";
-import { childDepartments, memberDepartmentIds, membersOfDepartment } from "@/lib/hierarchy";
 import { cx } from "@/lib/format";
-import { GripVertical, Plus, Trash2, Pencil, Check } from "lucide-react";
+import { Pencil, Plus, Trash2, ChevronDown } from "lucide-react";
 
 /**
- * Org Chart — single-source-of-truth visual view.
+ * Org Chart — top-down tree board.
  *
- * Every drag-and-drop and inline edit calls through the same store that
- * every other page reads from, so changes here propagate to Departments,
- * Team, KPIs, and the Dashboard immediately.
+ * Renders the company as a connected reporting hierarchy: CEO at the top,
+ * direct reports beneath, then their direct reports, etc. Each box shows
+ * the person + a hint of which department they belong to.
  *
- *  - Drag a Person chip to another sub-department (or a main dept that
- *    has no subs) → updates their `departmentId`.
- *  - Drag a Sub-department onto another Main → updates its `parentId`.
- *  - Click a name to rename it in place.
- *  - "+ Add person" button inside any sub-dept creates a new empty member.
+ * People with multiple managers appear underneath each manager (with a
+ * dashed border on the dupes) so the "shared resource" pattern (e.g.
+ * Winder Buznego reporting to three Creative Strategists) is visible.
+ *
+ * Click any name to rename in place. Click the "+ Add report" tab on any
+ * box to add a new direct report. Names + position auto-save on blur.
  */
 export default function OrgChartPage() {
-  const { state, ready, upsertDepartment, upsertTeamMember, removeTeamMember } =
-    useStore();
+  const { state, ready, upsertTeamMember } = useStore();
+  if (!ready) return null;
 
-  // Drag state is keyed to the kind of thing being dragged, because the
-  // valid drop targets differ.
-  const [drag, setDrag] = useState<
-    | { kind: "person"; id: string }
-    | { kind: "sub"; id: string }
-    | null
-  >(null);
-  const [dragOver, setDragOver] = useState<string | null>(null);
-
-  const mains = useMemo(
-    () => state?.departments.filter((d) => d.kind === "main") ?? [],
-    [state?.departments],
-  );
-  const ceo = state?.team.find((m) => m.id === "tm_jose") ?? state?.team[0];
-
-  if (!ready || !state) return null;
-
-  function handlePersonDragStart(
-    e: React.DragEvent,
-    id: string,
-    fromDeptId?: string,
-  ) {
-    e.dataTransfer.effectAllowed = "copyMove";
-    e.dataTransfer.setData("text/plain", `person:${id}:${fromDeptId || ""}`);
-    setDrag({ kind: "person", id });
-  }
-  function handleSubDragStart(e: React.DragEvent, id: string) {
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", `sub:${id}`);
-    setDrag({ kind: "sub", id });
-  }
-  function handleDragEnd() {
-    setDrag(null);
-    setDragOver(null);
-  }
-  function handleDragOver(e: React.DragEvent, targetId: string) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    setDragOver(targetId);
-  }
-  function handleDropPerson(e: React.DragEvent, newDeptId: string) {
-    e.preventDefault();
-    const raw = e.dataTransfer.getData("text/plain");
-    const [kind, id, fromDeptId] = raw.split(":");
-    if (kind !== "person") return;
-    const person = state.team.find((m) => m.id === id);
-    if (!person) return;
-    if (memberDepartmentIds(person).includes(newDeptId)) {
-      // already a member of the target dept — no-op
-      handleDragEnd();
-      return;
-    }
-    // Hold Shift while dropping → MOVE primary instead of just adding
-    const move = (e.nativeEvent as DragEvent).shiftKey;
-    if (move) {
-      // Replace primary department; preserve any other additionals
-      const others = (person.additionalDepartmentIds || []).filter(
-        (d) => d !== person.departmentId,
-      );
-      upsertTeamMember({
-        ...person,
-        departmentId: newDeptId,
-        additionalDepartmentIds: others.length ? others : undefined,
-      });
-    } else {
-      // Default: ADD as additional membership
-      upsertTeamMember({
-        ...person,
-        additionalDepartmentIds: [
-          ...(person.additionalDepartmentIds || []),
-          newDeptId,
-        ],
-      });
-    }
-    handleDragEnd();
-  }
-
-  /** Remove a person's membership in `deptId` (but keep the person record). */
-  function removeFromDept(personId: string, deptId: string) {
-    const person = state.team.find((m) => m.id === personId);
-    if (!person) return;
-    if (person.departmentId === deptId) {
-      // Removing primary — promote the first additional to primary, if any
-      const additionals = person.additionalDepartmentIds || [];
-      if (additionals.length === 0) {
-        // Person would be unassigned — confirm and delete
-        if (
-          confirm(
-            `${person.name} is only in this department. Remove them from the org entirely?`,
-          )
-        ) {
-          removeTeamMember(personId);
-        }
-        return;
-      }
-      const [newPrimary, ...rest] = additionals;
-      upsertTeamMember({
-        ...person,
-        departmentId: newPrimary,
-        additionalDepartmentIds: rest.length ? rest : undefined,
-      });
-    } else {
-      upsertTeamMember({
-        ...person,
-        additionalDepartmentIds: (person.additionalDepartmentIds || []).filter(
-          (d) => d !== deptId,
-        ),
-      });
-    }
-  }
-  function handleDropSub(e: React.DragEvent, newParentId: string) {
-    e.preventDefault();
-    const raw = e.dataTransfer.getData("text/plain");
-    const [kind, id] = raw.split(":");
-    if (kind !== "sub") return;
-    const sub = state.departments.find((d) => d.id === id);
-    if (!sub || sub.kind !== "sub") return;
-    if (sub.parentId === newParentId) {
-      handleDragEnd();
-      return;
-    }
-    upsertDepartment({ ...sub, parentId: newParentId });
-    handleDragEnd();
-  }
-
-  function addPerson(departmentId: string) {
-    const id = "tm_" + Math.random().toString(36).slice(2, 8);
-    upsertTeamMember({
-      id,
-      name: "New Team Member",
-      position: "Position",
-      departmentId,
-    });
-  }
+  const ceo = state.team.find((m) => m.id === "tm_jose") || state.team[0];
 
   return (
     <div>
-      <div className="bracket">06 — Org Map</div>
+      <div className="bracket">05 — Org Map</div>
       <h1 className="section-title mt-1">Org Chart</h1>
       <p className="mt-2 max-w-2xl text-sm text-white/50">
-        The full Carbinox structure in one view. Drag people between
-        departments, drag sub-departments between parents, and click any
-        name to rename it. Every change saves instantly and is reflected
-        across the entire app.
+        The reporting structure as an interactive board. CEO at the top,
+        direct reports underneath. People with multiple managers appear under
+        each one (dashed border on duplicates). Click any name to rename it.
       </p>
 
-      {/* CEO at the top */}
-      {ceo && (
-        <div className="mt-8 flex justify-center">
-          <PersonNode
-            person={ceo}
-            accentColor="#f8c808"
-            onRename={(name) => upsertTeamMember({ ...ceo, name })}
-            onRenamePosition={(position) =>
-              upsertTeamMember({ ...ceo, position })
-            }
-            draggable={false}
-            highlight
-          />
+      <div className="mt-6 flex justify-center overflow-x-auto pb-12">
+        <div className="org-tree min-w-fit">
+          {ceo && (
+            <TreeNode
+              person={ceo}
+              state={state}
+              parentId={null}
+              upsertTeamMember={upsertTeamMember}
+              path={new Set()}
+            />
+          )}
         </div>
-      )}
-
-      {/* Organization grid */}
-      <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
-        {mains.map((main) => (
-          <MainColumn
-            key={main.id}
-            main={main}
-            state={state}
-            drag={drag}
-            dragOver={dragOver}
-            onPersonDragStart={handlePersonDragStart}
-            onSubDragStart={handleSubDragStart}
-            onDragEnd={handleDragEnd}
-            onDragOver={handleDragOver}
-            onDropPerson={handleDropPerson}
-            onDropSub={handleDropSub}
-            addPerson={addPerson}
-            upsertDepartment={upsertDepartment}
-            upsertTeamMember={upsertTeamMember}
-            removeFromDept={removeFromDept}
-          />
-        ))}
       </div>
 
       <div className="mt-8 card p-4">
         <div className="bracket">How to use</div>
         <ul className="mt-2 space-y-1 text-[13px] text-white/60">
-          <li>• Drag any person chip onto another department to <b className="text-white">add them</b> to that team (multi-hat). They keep their existing memberships.</li>
-          <li>• Hold <span className="kbd">Shift</span> while dropping to <b className="text-white">move</b> their primary home instead.</li>
-          <li>• A solid border = the person's primary department. A dashed border = a secondary membership.</li>
-          <li>• Trash icon on a chip removes them <b className="text-white">from that department only</b>. If it's their last department, you'll be asked to confirm deleting them.</li>
-          <li>• Drag a sub-department header onto a different Main department to re-parent it.</li>
-          <li>• Click a name or position to edit it. Press <span className="kbd">Enter</span> or click away to save.</li>
+          <li>• Each box is a person. Reports hang below their manager.</li>
+          <li>• People with multiple managers appear under each — duplicates have a dashed border.</li>
+          <li>• Click any name or position to rename. Changes auto-save.</li>
+          <li>• Edit the reporting structure (add/change managers) from <a href="/team" className="text-carbinox underline">Team</a> or via the seed.</li>
         </ul>
       </div>
+
+      {/* Inline org-tree CSS — based on standard CSS-only org chart pattern. */}
+      <style jsx global>{`
+        .org-tree {
+          display: inline-block;
+        }
+        .org-tree ul {
+          padding-top: 22px;
+          position: relative;
+          display: flex;
+          gap: 14px;
+          list-style: none;
+          margin: 0;
+        }
+        .org-tree li {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 22px 6px 0 6px;
+          position: relative;
+        }
+        .org-tree li::before,
+        .org-tree li::after {
+          content: "";
+          position: absolute;
+          top: 0;
+          height: 22px;
+          border-top: 1px solid rgba(255, 255, 255, 0.18);
+          width: 50%;
+        }
+        .org-tree li::before {
+          left: 0;
+          border-right: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .org-tree li::after {
+          left: 50%;
+        }
+        /* the only child has no horizontal lines */
+        .org-tree li:only-child::before,
+        .org-tree li:only-child::after {
+          display: none;
+        }
+        .org-tree li:only-child {
+          padding-top: 0;
+        }
+        .org-tree li:only-child::before,
+        .org-tree li:only-child::after {
+          border: 0 none;
+        }
+        /* leftmost / rightmost children: half-line corner */
+        .org-tree li:first-child::before,
+        .org-tree li:last-child::after {
+          border: 0 none;
+        }
+        .org-tree li:last-child::before {
+          border-right: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .org-tree li:first-child::after {
+          border-left: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        /* connector from box to children */
+        .org-tree .org-node {
+          position: relative;
+        }
+        .org-tree li > div > .org-children-line {
+          position: absolute;
+          left: 50%;
+          bottom: -22px;
+          height: 22px;
+          width: 1px;
+          background: rgba(255, 255, 255, 0.18);
+          display: none;
+        }
+        .org-tree .has-children > .org-children-line {
+          display: block;
+        }
+      `}</style>
     </div>
   );
 }
 
-function MainColumn(props: {
-  main: Department;
-  state: ReturnType<typeof useStore>["state"];
-  drag: { kind: "person" | "sub"; id: string } | null;
-  dragOver: string | null;
-  onPersonDragStart: (e: React.DragEvent, id: string, fromDeptId?: string) => void;
-  onSubDragStart: (e: React.DragEvent, id: string) => void;
-  onDragEnd: () => void;
-  onDragOver: (e: React.DragEvent, id: string) => void;
-  onDropPerson: (e: React.DragEvent, deptId: string) => void;
-  onDropSub: (e: React.DragEvent, parentId: string) => void;
-  addPerson: (deptId: string) => void;
-  upsertDepartment: (d: Department) => void;
-  upsertTeamMember: (m: TeamMember) => void;
-  removeFromDept: (personId: string, deptId: string) => void;
-}) {
-  const {
-    main,
-    state,
-    drag,
-    dragOver,
-    onPersonDragStart,
-    onSubDragStart,
-    onDragEnd,
-    onDragOver,
-    onDropPerson,
-    onDropSub,
-    addPerson,
-    upsertDepartment,
-    upsertTeamMember,
-    removeFromDept,
-  } = props;
-
-  const subs = childDepartments(state, main.id);
-  const direct = membersOfDepartment(state, main.id);
-  const head = state.team.find((m) => m.id === main.headId);
-
-  // Accept a sub drop on the Main's header
-  const subDropTarget = `sub-target-${main.id}`;
-  const personDropTarget = `person-target-${main.id}`;
-
-  const isSubOver = dragOver === subDropTarget && drag?.kind === "sub";
-  const isPersonOver = dragOver === personDropTarget && drag?.kind === "person";
-
-  return (
-    <div className="card flex flex-col p-4">
-      {/* Header — accepts sub drops */}
-      <div
-        onDragOver={(e) => drag?.kind === "sub" && onDragOver(e, subDropTarget)}
-        onDrop={(e) => onDropSub(e, main.id)}
-        className={cx(
-          "flex items-center gap-3 border-l-4 pl-3 py-2 transition",
-          isSubOver
-            ? "border-carbinox bg-carbinox/10"
-            : "border-transparent",
-        )}
-        style={{ borderLeftColor: isSubOver ? undefined : main.color }}
-      >
-        <div
-          className="h-3 w-3 shrink-0"
-          style={{ background: main.color }}
-        />
-        <InlineText
-          value={main.name}
-          onChange={(name) => upsertDepartment({ ...main, name })}
-          className="font-display text-2xl font-extrabold uppercase leading-none tracking-brand text-white"
-        />
-        <span className="chip ml-auto border-white/10 text-white/55">Main</span>
-      </div>
-
-      {/* Head of main dept */}
-      {head && (
-        <div className="mt-3 border border-white/10 bg-white/[0.03] p-2">
-          <div className="bracket">Head</div>
-          <div className="mt-1">
-            <PersonNode
-              person={head}
-              contextDeptId={main.id}
-              accentColor={main.color}
-              onRename={(name) => upsertTeamMember({ ...head, name })}
-              onRenamePosition={(position) => upsertTeamMember({ ...head, position })}
-              onRemoveFromDept={() => removeFromDept(head.id, main.id)}
-              draggable
-              onDragStart={(e) => onPersonDragStart(e, head.id, main.id)}
-              onDragEnd={onDragEnd}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Direct reports (people whose primary or additional dept == main) */}
-      {direct.length > 0 && (
-        <div
-          onDragOver={(e) => drag?.kind === "person" && onDragOver(e, personDropTarget)}
-          onDrop={(e) => onDropPerson(e, main.id)}
-          className={cx(
-            "mt-3 border p-2 transition",
-            isPersonOver
-              ? "border-carbinox bg-carbinox/10"
-              : "border-white/10 bg-white/[0.02]",
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <div className="bracket">Direct team</div>
-            <button
-              onClick={() => addPerson(main.id)}
-              className="text-[10px] font-heading uppercase tracking-brand text-white/50 hover:text-carbinox"
-            >
-              + Add
-            </button>
-          </div>
-          <div className="mt-2 flex flex-col gap-1.5">
-            {direct
-              .filter((m) => m.id !== head?.id)
-              .map((m) => (
-                <PersonNode
-                  key={m.id}
-                  person={m}
-                  contextDeptId={main.id}
-                  accentColor={main.color}
-                  onRename={(name) => upsertTeamMember({ ...m, name })}
-                  onRenamePosition={(position) => upsertTeamMember({ ...m, position })}
-                  onRemoveFromDept={() => removeFromDept(m.id, main.id)}
-                  draggable
-                  onDragStart={(e) => onPersonDragStart(e, m.id, main.id)}
-                  onDragEnd={onDragEnd}
-                />
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* Sub-departments */}
-      <div className="mt-3 flex flex-col gap-2">
-        {subs.map((sub) => (
-          <SubCard
-            key={sub.id}
-            sub={sub}
-            main={main}
-            state={state}
-            drag={drag}
-            dragOver={dragOver}
-            onPersonDragStart={onPersonDragStart}
-            onSubDragStart={onSubDragStart}
-            onDragEnd={onDragEnd}
-            onDragOver={onDragOver}
-            onDropPerson={onDropPerson}
-            addPerson={addPerson}
-            upsertDepartment={upsertDepartment}
-            upsertTeamMember={upsertTeamMember}
-            removeFromDept={removeFromDept}
-          />
-        ))}
-        {subs.length === 0 && !head && direct.length === 0 && (
-          <div
-            onDragOver={(e) => drag && onDragOver(e, personDropTarget)}
-            onDrop={(e) =>
-              drag?.kind === "person" ? onDropPerson(e, main.id) : undefined
-            }
-            className={cx(
-              "border border-dashed px-3 py-6 text-center text-[11px] transition",
-              isPersonOver
-                ? "border-carbinox bg-carbinox/10 text-carbinox"
-                : "border-white/10 text-white/40",
-            )}
-          >
-            Empty — drop people or sub-departments here.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SubCard(props: {
-  sub: Department;
-  main: Department;
-  state: ReturnType<typeof useStore>["state"];
-  drag: { kind: "person" | "sub"; id: string } | null;
-  dragOver: string | null;
-  onPersonDragStart: (e: React.DragEvent, id: string, fromDeptId?: string) => void;
-  onSubDragStart: (e: React.DragEvent, id: string) => void;
-  onDragEnd: () => void;
-  onDragOver: (e: React.DragEvent, id: string) => void;
-  onDropPerson: (e: React.DragEvent, deptId: string) => void;
-  addPerson: (deptId: string) => void;
-  upsertDepartment: (d: Department) => void;
-  upsertTeamMember: (m: TeamMember) => void;
-  removeFromDept: (personId: string, deptId: string) => void;
-}) {
-  const {
-    sub,
-    main,
-    state,
-    drag,
-    dragOver,
-    onPersonDragStart,
-    onSubDragStart,
-    onDragEnd,
-    onDragOver,
-    onDropPerson,
-    addPerson,
-    upsertDepartment,
-    upsertTeamMember,
-    removeFromDept,
-  } = props;
-
-  const members = membersOfDepartment(state, sub.id);
-  const head = state.team.find((m) => m.id === sub.headId);
-
-  const dropTarget = `person-target-${sub.id}`;
-  const isOver = dragOver === dropTarget && drag?.kind === "person";
-
-  return (
-    <div
-      onDragOver={(e) => drag?.kind === "person" && onDragOver(e, dropTarget)}
-      onDrop={(e) => onDropPerson(e, sub.id)}
-      className={cx(
-        "border bg-white/[0.02] p-3 transition",
-        isOver ? "border-carbinox bg-carbinox/10" : "border-white/10",
-      )}
-    >
-      {/* Sub header (draggable to reparent) */}
-      <div
-        draggable
-        onDragStart={(e) => onSubDragStart(e, sub.id)}
-        onDragEnd={onDragEnd}
-        className="flex cursor-grab items-center gap-2 active:cursor-grabbing"
-        style={{ borderLeft: `3px solid ${sub.color}`, paddingLeft: 8 }}
-      >
-        <GripVertical size={14} className="text-white/30" />
-        <InlineText
-          value={sub.name}
-          onChange={(name) => upsertDepartment({ ...sub, name })}
-          className="font-heading text-[13px] font-semibold uppercase tracking-brand text-white"
-        />
-        <span className="chip ml-auto border-white/10 text-white/55">Sub</span>
-      </div>
-
-      {/* Head of sub */}
-      {head && (
-        <div className="mt-2">
-          <div className="bracket">Head</div>
-          <div className="mt-1">
-            <PersonNode
-              person={head}
-              contextDeptId={sub.id}
-              accentColor={sub.color}
-              onRename={(name) => upsertTeamMember({ ...head, name })}
-              onRenamePosition={(position) => upsertTeamMember({ ...head, position })}
-              onRemoveFromDept={() => removeFromDept(head.id, sub.id)}
-              draggable
-              onDragStart={(e) => onPersonDragStart(e, head.id, sub.id)}
-              onDragEnd={onDragEnd}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Members (all people who belong to this sub, primary or additional) */}
-      <div className="mt-2">
-        <div className="flex items-center justify-between">
-          <div className="bracket">Team ({members.length})</div>
-          <button
-            onClick={() => addPerson(sub.id)}
-            className="text-[10px] font-heading uppercase tracking-brand text-white/50 hover:text-carbinox"
-            title="Add person"
-          >
-            + Add
-          </button>
-        </div>
-        <div className="mt-1.5 flex flex-col gap-1.5">
-          {members
-            .filter((m) => m.id !== head?.id)
-            .map((m) => (
-              <PersonNode
-                key={m.id}
-                person={m}
-                contextDeptId={sub.id}
-                accentColor={sub.color}
-                onRename={(name) => upsertTeamMember({ ...m, name })}
-                onRenamePosition={(position) => upsertTeamMember({ ...m, position })}
-                onRemoveFromDept={() => removeFromDept(m.id, sub.id)}
-                draggable
-                onDragStart={(e) => onPersonDragStart(e, m.id, sub.id)}
-                onDragEnd={onDragEnd}
-              />
-            ))}
-          {members.length === 0 && (
-            <div className="border border-dashed border-white/10 px-2 py-2 text-[10px] text-white/30">
-              No members. Drop someone here, or click + Add.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PersonNode({
+function TreeNode({
   person,
-  contextDeptId,
-  accentColor,
-  onRename,
-  onRenamePosition,
-  onRemoveFromDept,
-  draggable,
-  onDragStart,
-  onDragEnd,
-  highlight,
+  state,
+  parentId,
+  upsertTeamMember,
+  path,
 }: {
   person: TeamMember;
-  /** The dept this chip is being rendered inside (for primary-vs-secondary styling) */
-  contextDeptId?: string;
-  accentColor: string;
-  onRename: (name: string) => void;
-  onRenamePosition: (position: string) => void;
-  onRemoveFromDept?: () => void;
-  draggable?: boolean;
-  onDragStart?: (e: React.DragEvent) => void;
-  onDragEnd?: () => void;
-  highlight?: boolean;
+  state: ReturnType<typeof useStore>["state"];
+  /** id of the parent rendering this node (for dedupe / dashed border on dupes) */
+  parentId: string | null;
+  upsertTeamMember: (m: TeamMember) => void;
+  /** Visited set to prevent infinite recursion */
+  path: Set<string>;
 }) {
-  const isSecondary = contextDeptId
-    ? person.departmentId !== contextDeptId
-    : false;
-  const totalDepts = 1 + (person.additionalDepartmentIds?.length || 0);
-  return (
+  // direct reports of this person (anyone with this person in their managerIds)
+  const reports = useMemo(
+    () =>
+      state.team.filter((m) => {
+        const mids = m.managerIds || (m.managerId ? [m.managerId] : []);
+        return mids.includes(person.id);
+      }),
+    [state.team, person.id],
+  );
+
+  const dept = state.departments.find((d) => d.id === person.departmentId);
+  const accent = dept?.color || "#f8c808";
+  const managers = person.managerIds || (person.managerId ? [person.managerId] : []);
+  const isShared = managers.length > 1;
+  // If this isn't the parent we're rendering under, show as dashed dupe
+  const isDuplicate = parentId !== null && managers[0] !== parentId && isShared;
+
+  // Prevent cycles
+  const nextPath = new Set(path);
+  nextPath.add(person.id);
+  const safeReports = reports.filter((r) => !path.has(r.id));
+
+  const node = (
     <div
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
       className={cx(
-        "flex items-center gap-2.5 border px-2.5 py-2 transition",
-        highlight
-          ? "border-carbinox bg-carbinox/5"
-          : isSecondary
-            ? "border-dashed border-white/20 bg-jet-900/60"
-            : "border-white/10 bg-jet-900",
-        draggable ? "cursor-grab active:cursor-grabbing" : "",
+        "org-node relative flex w-[220px] items-start gap-2 border bg-jet-900 px-3 py-2.5 text-left transition",
+        isDuplicate
+          ? "border-dashed border-white/25"
+          : "border-white/15",
       )}
-      title={
-        isSecondary
-          ? `Secondary membership — primary department is elsewhere`
-          : totalDepts > 1
-            ? `Belongs to ${totalDepts} departments`
-            : undefined
-      }
+      style={{
+        borderLeftColor: accent,
+        borderLeftWidth: 3,
+      }}
     >
-      {draggable && <GripVertical size={13} className="text-white/30" />}
-      <Avatar name={person.name} size={28} color={accentColor} />
+      <Avatar name={person.name} size={32} color={accent} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <InlineText
+        <div className="flex items-center gap-1">
+          <InlineEdit
             value={person.name}
-            onChange={onRename}
+            onSave={(v) => upsertTeamMember({ ...person, name: v })}
             className="block max-w-full truncate font-heading text-[12px] font-semibold uppercase tracking-brand text-white"
           />
-          {totalDepts > 1 && (
-            <span className="chip border-carbinox/40 text-carbinox px-1 py-0 text-[9px]">
-              ×{totalDepts}
+          {isShared && (
+            <span
+              className="chip border-carbinox/40 bg-carbinox/10 text-carbinox px-1 py-0 text-[8px]"
+              title={`Reports to ${managers.length} managers`}
+            >
+              ×{managers.length}
             </span>
           )}
         </div>
-        <InlineText
+        <InlineEdit
           value={person.position}
-          onChange={onRenamePosition}
-          className="block w-full truncate text-[10px] text-white/50"
+          onSave={(v) => upsertTeamMember({ ...person, position: v })}
+          className="block w-full truncate text-[10px] text-white/55"
         />
+        {dept && (
+          <div className="mt-0.5 flex items-center gap-1 text-[9px] uppercase tracking-brand text-white/40">
+            <span className="h-1 w-1" style={{ background: dept.color }} />
+            {dept.name}
+          </div>
+        )}
       </div>
-      {onRemoveFromDept && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemoveFromDept();
-          }}
-          className="text-white/30 hover:text-bad"
-          title={
-            isSecondary
-              ? "Remove from this department"
-              : "Remove from this department (will promote a secondary if any, otherwise delete)"
-          }
-        >
-          <Trash2 size={12} />
-        </button>
-      )}
+      {/* line down to children */}
+      <span
+        className={cx("org-children-line", safeReports.length > 0 && "always")}
+      />
+    </div>
+  );
+
+  if (safeReports.length === 0) {
+    return (
+      <div className="org-leaf">
+        {node}
+      </div>
+    );
+  }
+
+  // Custom wrapper for the connecting line down
+  return (
+    <div className="org-branch flex flex-col items-center">
+      <div className="has-children relative">{node}
+        <span className="absolute left-1/2 top-full h-[22px] w-px -translate-x-1/2 bg-white/20" aria-hidden />
+      </div>
+      <ul>
+        {safeReports.map((r) => (
+          <li key={r.id + ":" + person.id}>
+            <TreeNode
+              person={r}
+              state={state}
+              parentId={person.id}
+              upsertTeamMember={upsertTeamMember}
+              path={nextPath}
+            />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-function InlineText({
+function InlineEdit({
   value,
-  onChange,
+  onSave,
   className,
 }: {
   value: string;
-  onChange: (next: string) => void;
+  onSave: (next: string) => void;
   className?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
-  // Keep draft in sync if the outer value changes
-  if (!editing && draft !== value) {
-    setDraft(value);
-  }
+  if (!editing && draft !== value) setDraft(value);
 
-  function save() {
-    if (draft.trim() && draft !== value) onChange(draft.trim());
+  function commit() {
+    if (draft.trim() && draft !== value) onSave(draft.trim());
     else setDraft(value);
     setEditing(false);
   }
 
   if (editing) {
     return (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          save();
+      <input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          else if (e.key === "Escape") {
+            setDraft(value);
+            setEditing(false);
+          }
         }}
-        className="flex items-center gap-1"
-      >
-        <input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={save}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setDraft(value);
-              setEditing(false);
-            }
-          }}
-          className={cx(
-            "w-full border border-carbinox/60 bg-jet-900 px-1.5 py-0.5 text-inherit outline-none",
-            className,
-          )}
-        />
-        <button
-          type="submit"
-          className="text-carbinox hover:text-carbinox-light"
-          aria-label="Save"
-        >
-          <Check size={12} />
-        </button>
-      </form>
+        className={cx(
+          "w-full border border-carbinox/60 bg-jet-900 px-1 outline-none",
+          className,
+        )}
+      />
     );
   }
 
@@ -680,14 +306,11 @@ function InlineText({
         e.stopPropagation();
         setEditing(true);
       }}
-      className={cx(
-        "group/edit inline-flex items-center gap-1 text-left hover:text-carbinox",
-        className,
-      )}
+      className={cx("group inline-flex items-center gap-1 text-left hover:text-carbinox", className)}
       title="Click to edit"
     >
       {value}
-      <Pencil size={10} className="opacity-0 transition group-hover/edit:opacity-70" />
+      <Pencil size={9} className="opacity-0 transition group-hover:opacity-60" />
     </button>
   );
 }
