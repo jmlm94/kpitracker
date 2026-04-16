@@ -14,7 +14,12 @@ export async function GET(req: Request) {
   const code = url.searchParams.get("code");
   const shop = url.searchParams.get("shop");
   const state = url.searchParams.get("state");
-  const origin = url.origin;
+  const host =
+    req.headers.get("x-forwarded-host") ||
+    req.headers.get("host") ||
+    url.host;
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const origin = `${proto}://${host}`;
 
   function errorRedirect(message: string) {
     const out = new URL("/integrations", origin);

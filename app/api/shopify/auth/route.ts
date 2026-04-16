@@ -40,8 +40,14 @@ export async function POST(req: Request) {
     );
   }
 
-  // Build the absolute callback URL using the request's origin
-  const origin = new URL(req.url).origin;
+  // Build the absolute callback URL. On Vercel, req.url may use an internal
+  // host, so we derive from the forwarded headers instead.
+  const host =
+    req.headers.get("x-forwarded-host") ||
+    req.headers.get("host") ||
+    new URL(req.url).host;
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const origin = `${proto}://${host}`;
   const redirectUri = `${origin}/api/shopify/callback`;
 
   // Random nonce for CSRF protection (and to link this install to the cookie)
