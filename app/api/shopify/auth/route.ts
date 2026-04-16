@@ -40,15 +40,25 @@ export async function POST(req: Request) {
     );
   }
 
-  // Build the absolute callback URL. On Vercel, req.url may use an internal
-  // host, so we derive from the forwarded headers instead.
-  const host =
-    req.headers.get("x-forwarded-host") ||
-    req.headers.get("host") ||
-    new URL(req.url).host;
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const origin = `${proto}://${host}`;
-  const redirectUri = `${origin}/api/shopify/callback`;
+  // Build the absolute callback URL. Order of preference:
+  //   1. SHOPIFY_REDIRECT_URI env var (explicit override for stable URL)
+  //   2. NEXT_PUBLIC_APP_URL env var
+  //   3. Vercel's forwarded host headers
+  //   4. req.url
+  let redirectUri = process.env.SHOPIFY_REDIRECT_URI;
+  if (!redirectUri) {
+    const baseFromEnv = process.env.NEXT_PUBLIC_APP_URL;
+    if (baseFromEnv) {
+      redirectUri = `${baseFromEnv.replace(/\/$/, "")}/api/shopify/callback`;
+    } else {
+      const host =
+        req.headers.get("x-forwarded-host") ||
+        req.headers.get("host") ||
+        new URL(req.url).host;
+      const proto = req.headers.get("x-forwarded-proto") || "https";
+      redirectUri = `${proto}://${host}/api/shopify/callback`;
+    }
+  }
 
   // Random nonce for CSRF protection (and to link this install to the cookie)
   const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -81,5 +91,5 @@ export async function POST(req: Request) {
     maxAge: 60 * 10, // 10 minutes
   });
 
-  return NextResponse.json({ ok: true, installUrl });
+  return NextResponse.json({ ok: true, installUrl, redirectUri });
 }

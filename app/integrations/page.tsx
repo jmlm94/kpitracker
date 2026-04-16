@@ -521,6 +521,23 @@ function OAuthInstallBlock() {
   const [showSecret, setShowSecret] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [redirectUri, setRedirectUri] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/shopify/redirect-url")
+      .then((r) => r.json())
+      .then((d) => setRedirectUri(d.redirectUri))
+      .catch(() => {});
+  }, []);
+
+  function copyRedirect() {
+    if (!redirectUri) return;
+    navigator.clipboard.writeText(redirectUri).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
 
   async function startInstall() {
     setError(null);
@@ -561,6 +578,25 @@ function OAuthInstallBlock() {
         redirects you to Shopify to approve the install, then sends you back
         here with the access token applied automatically.
       </p>
+
+      {/* Redirect URL to whitelist — critical */}
+      {redirectUri && (
+        <div className="mt-3 border border-carbinox/40 bg-carbinox/5 p-3">
+          <div className="bracket text-carbinox">Whitelist this exact URL in your Shopify app</div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <code className="flex-1 break-all bg-jet-900 border border-white/10 px-2 py-1.5 text-[11px] font-numeric text-white">
+              {redirectUri}
+            </code>
+            <button onClick={copyRedirect} className="btn-ghost py-1">
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <div className="mt-1.5 text-[10px] text-white/50">
+            In the Shopify dev dashboard → your app → Configuration → Redirect URLs,
+            add this exact string (must match character-for-character, including protocol and no trailing slash).
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
         <div>
