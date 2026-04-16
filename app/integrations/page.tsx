@@ -8,9 +8,11 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  HelpCircle,
   Plug,
   RefreshCw,
   Save,
+  ShieldCheck,
   ShoppingBag,
 } from "lucide-react";
 import { cx } from "@/lib/format";
@@ -177,6 +179,12 @@ function ShopifyCard({
   const [token, setToken] = useState(creds.SHOPIFY_ADMIN_TOKEN || "");
   const [showToken, setShowToken] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<
+    | null
+    | { ok: true; shop: { name: string; myshopifyDomain: string; primaryDomain?: string; currency: string; plan?: string } }
+    | { ok: false; error: string }
+  >(null);
 
   const ok = integration.lastSyncStatus === "ok";
   const err = integration.lastSyncStatus === "error";
@@ -184,6 +192,24 @@ function ShopifyCard({
   const dirty =
     shop !== (creds.SHOPIFY_SHOP || "") ||
     token !== (creds.SHOPIFY_ADMIN_TOKEN || "");
+
+  async function verify() {
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const res = await fetch("/api/shopify/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ shop: shop.trim(), token: token.trim() }),
+      });
+      const data = await res.json();
+      setVerifyResult(data);
+    } catch (e: any) {
+      setVerifyResult({ ok: false, error: e?.message || "Network error" });
+    } finally {
+      setVerifying(false);
+    }
+  }
 
   function saveCredentials() {
     updateIntegration("shopify", {
@@ -296,6 +322,14 @@ function ShopifyCard({
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
+          onClick={verify}
+          disabled={!hasCredentials || verifying}
+          className="btn-ghost disabled:opacity-40"
+        >
+          <ShieldCheck size={13} className={verifying ? "animate-pulse" : ""} />
+          {verifying ? "Verifying…" : "Verify credentials"}
+        </button>
+        <button
           onClick={saveCredentials}
           disabled={!hasCredentials || (!dirty && !saved)}
           className="btn-primary disabled:opacity-40"
@@ -317,6 +351,47 @@ function ShopifyCard({
           </span>
         )}
       </div>
+
+      {verifyResult && (
+        <div className="mt-4">
+          {verifyResult.ok ? (
+            <div className="border border-ok/30 bg-ok/10 p-3 text-[12px] text-ok">
+              <div className="flex items-center gap-2 font-heading font-semibold uppercase tracking-brand">
+                <CheckCircle2 size={14} /> Connected to {verifyResult.shop.name}
+              </div>
+              <div className="mt-1.5 grid grid-cols-2 gap-1 text-white/70">
+                <div>
+                  <span className="text-white/40">Domain:</span>{" "}
+                  {verifyResult.shop.myshopifyDomain}
+                </div>
+                {verifyResult.shop.primaryDomain && (
+                  <div>
+                    <span className="text-white/40">Primary:</span>{" "}
+                    {verifyResult.shop.primaryDomain}
+                  </div>
+                )}
+                <div>
+                  <span className="text-white/40">Currency:</span>{" "}
+                  {verifyResult.shop.currency}
+                </div>
+                {verifyResult.shop.plan && (
+                  <div>
+                    <span className="text-white/40">Plan:</span>{" "}
+                    {verifyResult.shop.plan}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="border border-bad/30 bg-bad/10 p-3 text-[12px] text-bad">
+              <div className="flex items-center gap-2 font-heading font-semibold uppercase tracking-brand">
+                <CircleAlert size={14} /> Verification failed
+              </div>
+              <div className="mt-1.5 text-white/80">{verifyResult.error}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {integration.lastSyncMessage && (
         <div className="mt-4">
