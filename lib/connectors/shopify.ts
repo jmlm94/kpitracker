@@ -280,3 +280,183 @@ function mtdSamples(samples: { date: string; value: number }[]): typeof samples 
 function mtdSum(samples: { date: string; value: number }[]): number {
   return mtdSamples(samples).reduce((a, s) => a + s.value, 0);
 }
+
+export type ShopifySummary = {
+  source: "live" | "simulated";
+  note?: string;
+  dateRange: { start: string; end: string; days: number };
+  /** Daily samples — one entry per day in the range */
+  samples: {
+    date: string;
+    revenue: number;
+    orders: number;
+    fulfillmentsWithinSLA: number;
+    paidOrders: number;
+  }[];
+  totals: {
+    revenue: number;
+    orders: number;
+    aov: number;
+    fulfillmentSLAPct: number;
+    paidRatioPct: number;
+  };
+};
+
+/**
+ * Pull a single 1-pass summary for the dashboard. Fetches every order in
+ * [startISO, endISO] and computes daily revenue / order count / fulfillment
+ * SLA / paid ratio, plus overall totals.
+ *
+ * Uses credentials from the request (or env vars as fallback). Returns a
+ * simulated summary if credentials are missing so the UI still renders.
+ */
+export async function fetchShopifySummary(
+  credentials: Record<string, string> | undefined,
+  startISO: string,
+  endISO: string,
+): Promise<ShopifySummary> {
+  const creds = getCreds(credentials);
+  const days = Math.max(
+    1,
+    Math.round(
+      (new Date(endISO).getTime() - new Date(startISO).getTime()) / 86400000,
+    ) + 1,
+  );
+
+  const dates: string[] = [];
+  const cur = new Date(startISO);
+  cur.setHours(0, 0, 0, 0);
+  const endDate = new Date(endISO);
+  endDate.setHours(0, 0, 0, 0);
+  while (cur <= endDate) {
+    dates.push(isoDay(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  if (!creds) {
+    return simulateSummary(startISO, endISO, dates);
+  }
+
+  try {
+    const orders = await fetchOrders(creds, startISO, endISO);
+    return buildSummary(orders, dates, startISO, endISO);
+  } catch (err: any) {
+    return simulateSummary(
+      startISO,
+      endISO,
+      dates,
+      `Shopify error: ${err?.message || "Unknown"} — showing simulated data.`,
+    );
+  }
+}
+
+function buildSummary(
+  orders: OrderNode[],
+  dates: string[],
+  startISO: string,
+  endISO: string,
+): ShopifySummary {
+  const dailyRevenue = new Map<string, number>();
+  const dailyOrders = new Map<string, number>();
+  const dailyInSLA = new Map<string, number>();
+  const dailyPaid = new Map<string, number>();
+  for (const d of dates) {
+    dailyRevenue.set(d, 0);
+    dailyOrders.set(d, 0);
+    dailyInSLA.set(d, 0);
+    dailyPaid.set(d, 0);
+  }
+  for (const o of orders) {
+    const day = o.createdAt.slice(0, 10);
+    if (!dailyRevenue.has(day)) continue;
+    const amount = parseFloat(o.totalPriceSet.shopMoney.amount);
+    dailyRevenue.set(day, (dailyRevenue.get(day) || 0) + amount);
+    dailyOrders.set(day, (dailyOrders.get(day) || 0) + 1);
+    if (amount > 0) dailyPaid.set(day, (dailyPaid.get(day) || 0) + 1);
+    if (o.fulfillments.length > 0) {
+      const diffH =
+        (new Date(o.fulfillments[0].createdAt).getTime() -
+          new Date(o.createdAt).getTime()) /
+        3_600_000;
+      if (diffH <= 24) dailyInSLA.set(day, (dailyInSLA.get(day) || 0) + 1);
+    }
+  }
+
+  const samples = dates.map((d) => ({
+    date: d,
+    revenue: round2(dailyRevenue.get(d) || 0),
+    orders: dailyOrders.get(d) || 0,
+    fulfillmentsWithinSLA: dailyInSLA.get(d) || 0,
+    paidOrders: dailyPaid.get(d) || 0,
+  }));
+
+  const totalRev = samples.reduce((a, s) => a + s.revenue, 0);
+  const totalOrders = samples.reduce((a, s) => a + s.orders, 0);
+  const totalInSLA = samples.reduce((a, s) => a + s.fulfillmentsWithinSLA, 0);
+  const totalPaid = samples.reduce((a, s) => a + s.paidOrders, 0);
+  const fulfillable = samples.reduce(
+    (a, s) => a + Math.min(s.orders, s.fulfillmentsWithinSLA === 0 ? s.orders : s.orders),
+    0,
+  );
+
+  return {
+    source: "live",
+    dateRange: { start: startISO, end: endISO, days: dates.length },
+    samples,
+    totals: {
+      revenue: round2(totalRev),
+      orders: totalOrders,
+      aov: totalOrders > 0 ? round2(totalRev / totalOrders) : 0,
+      fulfillmentSLAPct:
+        fulfillable > 0 ? Number(((totalInSLA / Math.max(1, totalOrders)) * 100).toFixed(1)) : 0,
+      paidRatioPct:
+        totalOrders > 0 ? Number(((totalPaid / totalOrders) * 100).toFixed(1)) : 0,
+    },
+  };
+}
+
+function simulateSummary(
+  startISO: string,
+  endISO: string,
+  dates: string[],
+  note = "Shopify credentials not configured — showing simulated data.",
+): ShopifySummary {
+  const avgDailyRev = 45000; // placeholder daily avg
+  const avgOrders = 300;
+  const samples = dates.map((d, i) => {
+    const drift = Math.sin(i * 0.6) * 0.15;
+    const jitter = (Math.random() - 0.5) * 0.2;
+    const rev = Math.max(0, Math.round(avgDailyRev * (1 + drift + jitter)));
+    const ords = Math.max(0, Math.round(avgOrders * (1 + drift + jitter)));
+    return {
+      date: d,
+      revenue: rev,
+      orders: ords,
+      fulfillmentsWithinSLA: Math.round(ords * (0.95 + Math.random() * 0.04)),
+      paidOrders: Math.round(ords * (0.97 + Math.random() * 0.02)),
+    };
+  });
+  const totalRev = samples.reduce((a, s) => a + s.revenue, 0);
+  const totalOrders = samples.reduce((a, s) => a + s.orders, 0);
+  const totalInSLA = samples.reduce((a, s) => a + s.fulfillmentsWithinSLA, 0);
+  const totalPaid = samples.reduce((a, s) => a + s.paidOrders, 0);
+  return {
+    source: "simulated",
+    note,
+    dateRange: { start: startISO, end: endISO, days: dates.length },
+    samples,
+    totals: {
+      revenue: totalRev,
+      orders: totalOrders,
+      aov: totalOrders > 0 ? round2(totalRev / totalOrders) : 0,
+      fulfillmentSLAPct:
+        totalOrders > 0 ? Number(((totalInSLA / totalOrders) * 100).toFixed(1)) : 0,
+      paidRatioPct:
+        totalOrders > 0 ? Number(((totalPaid / totalOrders) * 100).toFixed(1)) : 0,
+    },
+  };
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
