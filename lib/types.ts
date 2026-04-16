@@ -29,6 +29,8 @@ export type Target = {
   kpiId: string;
   /** Owner team member who's accountable */
   ownerId: string;
+  /** Department this KPI belongs to (matters when the owner is multi-hat) */
+  departmentId?: string;
   /** Optional secondary owners (e.g. department head) */
   watcherIds?: string[];
   target: number;

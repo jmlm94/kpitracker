@@ -286,10 +286,32 @@ function k(
 
 const kpis: KPI[] = kpiSpecs.map(({ target, ownerId, watcherIds, today, last7, mtd, ...kpi }) => kpi);
 
+function deptForMetricKey(key: string): string | undefined {
+  const k = key.toLowerCase();
+  if (k.startsWith("meta.") || k.startsWith("google.") || k.startsWith("tiktok.") ||
+      k.startsWith("snap.") || k.startsWith("applovin.") || k.startsWith("blended.")) {
+    return "dep_advertising";
+  }
+  if (k.startsWith("creative.") || k.startsWith("content.")) return "dep_creative";
+  if (k.startsWith("email.") || k.startsWith("sms.") || k.startsWith("social.")) return "dep_organic";
+  if (k.startsWith("lp.")) return "dep_lp";
+  if (k.startsWith("site.") || k.startsWith("cro.") || k.startsWith("orders.") || k.startsWith("checkout.")) return "dep_cro";
+  if (k.startsWith("amazon.")) return "dep_amazon";
+  if (k.startsWith("tiktokshop.")) return "dep_ttshop";
+  if (k.startsWith("marketplaces.")) return "dep_marketplace";
+  if (k.startsWith("supply.")) return "dep_supply";
+  if (k.startsWith("fulfillment.")) return "dep_fulfillment";
+  if (k.startsWith("cs.")) return "dep_cs";
+  if (k.startsWith("finance.")) return "dep_finance";
+  if (k.startsWith("ea.") || k.startsWith("company.")) return "dep_exec";
+  return undefined;
+}
+
 const targets: Target[] = kpiSpecs.map((s) => ({
   id: `t_${s.id.replace("kpi_", "")}`,
   kpiId: s.id,
   ownerId: s.ownerId,
+  departmentId: deptForMetricKey(s.metricKey),
   watcherIds: s.watcherIds?.length ? s.watcherIds : undefined,
   target: s.target,
   period: "monthly",

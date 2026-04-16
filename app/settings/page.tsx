@@ -105,6 +105,8 @@ type DraftKPI = {
   window: KPI["window"];
   target: number;
   description?: string;
+  /** Department this KPI is logged against (for multi-hat people) */
+  departmentId?: string;
   removed?: boolean;
 };
 
@@ -213,6 +215,7 @@ function PersonKpiEditor({
         window: k.window,
         target: t.target,
         description: k.description,
+        departmentId: t.departmentId,
       });
     }
     return out;
@@ -245,6 +248,7 @@ function PersonKpiEditor({
         window: base?.window || "mtd",
         target: base?.target ?? 100,
         description: base?.description,
+        departmentId: base?.departmentId,
       },
     ]);
   }
@@ -258,6 +262,8 @@ function PersonKpiEditor({
       window: p.window,
       target: p.target,
       description: p.description,
+      // Default to the person's primary department; user can change in the row.
+      departmentId: person?.departmentId,
     });
   }
 
@@ -293,6 +299,7 @@ function PersonKpiEditor({
           id: targetId,
           kpiId,
           ownerId: person.id,
+          departmentId: r.departmentId,
           target: Number(r.target) || 0,
           period: "monthly",
           periodKey: new Date().toISOString().slice(0, 7),
@@ -302,68 +309,130 @@ function PersonKpiEditor({
     setTimeout(() => setFlash(false), 1600);
   }
 
+  // Group draft rows by department for the per-person view. The list of
+  // departments to render is the union of (a) the person's memberships and
+  // (b) any departments referenced by their existing KPIs (so a KPI tagged
+  // to a dept they're no longer in still appears).
+  const personDepts = memberDepartmentIds(person)
+    .map((id) => state.departments.find((d) => d.id === id))
+    .filter((d): d is Department => !!d);
+  const visibleRowsWithIdx = draft
+    .map((row, idx) => ({ row, idx }))
+    .filter(({ row }) => !row.removed);
+  const groupKeys = Array.from(
+    new Set([
+      ...personDepts.map((d) => d.id),
+      ...visibleRowsWithIdx.map(({ row }) => row.departmentId).filter((x): x is string => !!x),
+    ]),
+  );
+  // Add an "Unassigned" bucket if some rows don't have a dept
+  if (visibleRowsWithIdx.some(({ row }) => !row.departmentId)) {
+    groupKeys.push("__unassigned__");
+  }
+
   return (
     <div className="p-4">
-      {/* KPI rows */}
-      <div className="space-y-2">
-        {visibleRows.length === 0 && (
+      {/* KPI rows grouped by department */}
+      <div className="space-y-4">
+        {visibleRowsWithIdx.length === 0 && (
           <div className="border border-dashed border-white/10 px-3 py-3 text-[12px] text-white/40">
             No KPIs. Use a preset below or add a custom one.
           </div>
         )}
-        {draft.map((row, idx) =>
-          row.removed ? null : (
-            <div
-              key={idx}
-              className="grid grid-cols-12 items-center gap-1.5 border border-white/10 bg-jet-900 p-2"
-            >
-              <input
-                value={row.name}
-                onChange={(e) => update(idx, { name: e.target.value })}
-                className="col-span-5 bg-transparent font-heading text-[12px] font-semibold uppercase tracking-brand text-white outline-none"
-                placeholder="KPI name"
-              />
-              <input
-                type="number"
-                step="any"
-                value={row.target}
-                onChange={(e) => update(idx, { target: Number(e.target.value) })}
-                className="input col-span-2 px-1.5 py-1 text-right font-numeric text-[12px]"
-                placeholder="Target"
-              />
-              <select
-                value={row.provider}
-                onChange={(e) => update(idx, { provider: e.target.value as Provider })}
-                className="input col-span-3 px-1.5 py-1 text-[11px]"
-                title="Source"
-              >
-                {providerOptions.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
+        {groupKeys.map((deptId) => {
+          const dept = state.departments.find((d) => d.id === deptId);
+          const groupRows = visibleRowsWithIdx.filter(
+            ({ row }) =>
+              (deptId === "__unassigned__" && !row.departmentId) ||
+              row.departmentId === deptId,
+          );
+          if (groupRows.length === 0) return null;
+          const label = dept?.name || "Unassigned";
+          const color = dept?.color || "#6b6b6b";
+          return (
+            <div key={deptId}>
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className="h-2 w-2" style={{ background: color }} />
+                <span className="font-heading text-[10px] font-semibold uppercase tracking-brand text-white/70">
+                  {label}
+                </span>
+                <span className="font-numeric text-[10px] text-white/35">
+                  ({groupRows.length})
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {groupRows.map(({ row, idx }) => (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-12 items-center gap-1.5 border border-white/10 bg-jet-900 p-2"
+                  >
+                    <input
+                      value={row.name}
+                      onChange={(e) => update(idx, { name: e.target.value })}
+                      className="col-span-4 bg-transparent font-heading text-[12px] font-semibold uppercase tracking-brand text-white outline-none"
+                      placeholder="KPI name"
+                    />
+                    <input
+                      type="number"
+                      step="any"
+                      value={row.target}
+                      onChange={(e) => update(idx, { target: Number(e.target.value) })}
+                      className="input col-span-2 px-1.5 py-1 text-right font-numeric text-[12px]"
+                      placeholder="Target"
+                    />
+                    <select
+                      value={row.provider}
+                      onChange={(e) =>
+                        update(idx, { provider: e.target.value as Provider })
+                      }
+                      className="input col-span-2 px-1.5 py-1 text-[11px]"
+                      title="Source"
+                    >
+                      {providerOptions.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={row.departmentId || ""}
+                      onChange={(e) =>
+                        update(idx, { departmentId: e.target.value || undefined })
+                      }
+                      className="input col-span-2 px-1.5 py-1 text-[11px]"
+                      title="Department"
+                    >
+                      <option value="">— Dept —</option>
+                      {personDepts.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={row.unit}
+                      onChange={(e) => update(idx, { unit: e.target.value as Unit })}
+                      className="input col-span-1 px-1 py-1 text-[10px]"
+                    >
+                      {unitOptions.map((u) => (
+                        <option key={u.value} value={u.value}>
+                          {u.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => removeRow(idx)}
+                      className="col-span-1 justify-self-end text-white/30 hover:text-bad"
+                      title="Remove KPI"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 ))}
-              </select>
-              <select
-                value={row.unit}
-                onChange={(e) => update(idx, { unit: e.target.value as Unit })}
-                className="input col-span-1 px-1 py-1 text-[10px]"
-              >
-                {unitOptions.map((u) => (
-                  <option key={u.value} value={u.value}>
-                    {u.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => removeRow(idx)}
-                className="col-span-1 justify-self-end text-white/30 hover:text-bad"
-                title="Remove KPI"
-              >
-                <Trash2 size={12} />
-              </button>
+              </div>
             </div>
-          ),
-        )}
+          );
+        })}
       </div>
 
       {/* Add controls */}
