@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import {
   CheckCircle2,
@@ -28,6 +28,44 @@ const SHOPIFY_SCOPES = [
 export default function IntegrationsPage() {
   const { state, ready, updateIntegration, setProgress } = useStore();
   const [busy, setBusy] = useState<string | null>(null);
+  const [oauthNotice, setOauthNotice] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Handle the ?shopify_installed=1&token=&shop= redirect from OAuth callback
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    const shop = params.get("shop");
+    const err = params.get("shopify_error");
+    if (err) {
+      setOauthNotice({ ok: false, message: err });
+      const clean = new URL(window.location.href);
+      ["shopify_error", "shopify_installed", "token", "shop", "scope"].forEach((k) =>
+        clean.searchParams.delete(k),
+      );
+      window.history.replaceState({}, "", clean.toString());
+      return;
+    }
+    if (token && shop) {
+      updateIntegration("shopify", {
+        connected: true,
+        credentials: {
+          SHOPIFY_SHOP: shop,
+          SHOPIFY_ADMIN_TOKEN: token,
+        },
+        lastSyncStatus: "ok",
+        lastSyncMessage: `Installed on ${shop}`,
+        lastSyncAt: new Date().toISOString(),
+      });
+      setOauthNotice({ ok: true, message: `Successfully installed on ${shop}` });
+      const clean = new URL(window.location.href);
+      ["shopify_installed", "token", "shop", "scope"].forEach((k) =>
+        clean.searchParams.delete(k),
+      );
+      window.history.replaceState({}, "", clean.toString());
+    }
+  }, [updateIntegration]);
+
   if (!ready) return null;
 
   async function testSync(provider: string) {
@@ -76,6 +114,20 @@ export default function IntegrationsPage() {
         Connect Carbinox's data sources. Enter credentials below or set
         environment variables in Vercel for production.
       </p>
+
+      {oauthNotice && (
+        <div
+          className={cx(
+            "mt-4 flex items-center gap-2 border p-3 text-[12px]",
+            oauthNotice.ok
+              ? "border-ok/30 bg-ok/10 text-ok"
+              : "border-bad/30 bg-bad/10 text-bad",
+          )}
+        >
+          {oauthNotice.ok ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}
+          {oauthNotice.message}
+        </div>
+      )}
 
       {/* Shopify — featured card with full setup flow */}
       {shopify && (
@@ -256,9 +308,12 @@ function ShopifyCard({
         </div>
       </div>
 
+      {/* OAuth install flow (Partners / dev dashboard apps) */}
+      <OAuthInstallBlock />
+
       {/* Setup instructions */}
       <div className="mt-6 card bg-white/[0.02] p-4">
-        <div className="bracket">How to connect</div>
+        <div className="bracket">Option B — Direct token (Custom apps)</div>
         <ol className="mt-2 space-y-1.5 text-[13px] text-white/65 list-decimal list-inside">
           <li>
             Go to <b className="text-white">Shopify Admin → Settings → Apps → Develop apps</b>
@@ -455,6 +510,120 @@ function SyncMessage({
     >
       {ok ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}
       {message}
+    </div>
+  );
+}
+
+function OAuthInstallBlock() {
+  const [shop, setShop] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function startInstall() {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/shopify/auth", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          shop: shop.trim(),
+          clientId: clientId.trim(),
+          clientSecret: clientSecret.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok || !data.installUrl) {
+        setError(data.error || "Failed to build install URL.");
+        setBusy(false);
+        return;
+      }
+      // Send the user to Shopify to approve the install
+      window.location.href = data.installUrl;
+    } catch (e: any) {
+      setError(e?.message || "Network error");
+      setBusy(false);
+    }
+  }
+
+  const ready = !!(shop && clientId && clientSecret);
+
+  return (
+    <div className="mt-6 card bg-white/[0.02] p-4">
+      <div className="bracket">Option A — OAuth install (Partners / dev dashboard apps)</div>
+      <p className="mt-2 text-[12px] text-white/55">
+        Paste your app's <b className="text-white">Client ID</b> and{" "}
+        <b className="text-white">Client Secret</b> from the Shopify dev
+        dashboard, plus your shop domain. Clicking <b className="text-white">Install on Shopify</b>{" "}
+        redirects you to Shopify to approve the install, then sends you back
+        here with the access token applied automatically.
+      </p>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div>
+          <label className="label">Shop domain</label>
+          <input
+            value={shop}
+            onChange={(e) => setShop(e.target.value)}
+            placeholder="carbinox.myshopify.com"
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="label">Client ID</label>
+          <input
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            placeholder="from Shopify dev dashboard"
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="label">Client Secret</label>
+          <div className="relative">
+            <input
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+              type={showSecret ? "text" : "password"}
+              placeholder="•••••••••••"
+              className="input pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowSecret(!showSecret)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+            >
+              {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          onClick={startInstall}
+          disabled={!ready || busy}
+          className="btn-primary disabled:opacity-40"
+        >
+          <ExternalLink size={13} />
+          {busy ? "Redirecting…" : "Install on Shopify"}
+        </button>
+        <span className="text-[11px] text-white/40">
+          Your app must have <span className="kbd">embedded: false</span> and this
+          redirect URL: <span className="kbd">/api/shopify/callback</span>
+        </span>
+      </div>
+
+      {error && (
+        <div className="mt-3 border border-bad/30 bg-bad/10 p-2.5 text-[12px] text-bad">
+          <div className="flex items-start gap-2">
+            <CircleAlert size={14} /> {error}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
