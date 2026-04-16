@@ -32,11 +32,6 @@ export async function POST(req: Request) {
       `Shop domain should end in .myshopify.com (got "${shop}"). Use your *.myshopify.com domain, not your custom storefront domain.`,
     );
   }
-  if (token && !/^shpat_/.test(token)) {
-    problems.push(
-      `Token should start with "shpat_" — it looks like you pasted something else. You may have copied the "API key" or "API secret key" instead of the "Admin API access token".`,
-    );
-  }
   if (problems.length > 0) {
     return NextResponse.json({ ok: false, error: problems.join(" ") }, { status: 400 });
   }

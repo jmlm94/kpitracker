@@ -454,6 +454,9 @@ function ShopifyCard({
         </div>
       )}
 
+      {/* Diagnostic panel */}
+      <DiagnosticPanel integration={integration} />
+
       {/* What data Shopify provides */}
       <div className="mt-6 border-t border-white/5 pt-4">
         <div className="bracket">Available metrics</div>
@@ -658,6 +661,92 @@ function OAuthInstallBlock() {
           <div className="flex items-start gap-2">
             <CircleAlert size={14} /> {error}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiagnosticPanel({
+  integration,
+}: {
+  integration: NonNullable<ReturnType<typeof useStore>["state"]["integrations"][0]>;
+}) {
+  const creds = integration.credentials || {};
+  const shop = creds.SHOPIFY_SHOP || "(none)";
+  const token = creds.SHOPIFY_ADMIN_TOKEN || "";
+  const tokenPrefix = token ? token.slice(0, 10) + "…" + token.slice(-4) : "(none)";
+  const tokenLength = token.length;
+
+  const [verifying, setVerifying] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  async function verify() {
+    setVerifying(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/shopify/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ shop, token }),
+      });
+      const data = await res.json();
+      setResult({ httpStatus: res.status, ...data });
+    } catch (e: any) {
+      setResult({ httpStatus: 0, error: e?.message || "Network error" });
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 card bg-white/[0.02] p-4">
+      <div className="bracket">Diagnostics</div>
+      <div className="mt-2 grid grid-cols-1 gap-2 text-[11px] md:grid-cols-3">
+        <div>
+          <div className="text-white/40">Saved shop</div>
+          <code className="block break-all text-white">{shop}</code>
+        </div>
+        <div>
+          <div className="text-white/40">Token (masked)</div>
+          <code className="block break-all text-white">{tokenPrefix}</code>
+        </div>
+        <div>
+          <div className="text-white/40">Token length</div>
+          <code className="block text-white">{tokenLength} chars</code>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <button onClick={verify} disabled={verifying || !token} className="btn-ghost py-1">
+          {verifying ? "Verifying…" : "Verify saved credentials"}
+        </button>
+        <span className="text-[10px] text-white/40">
+          Hits Shopify's shop endpoint with the stored token to prove it works
+        </span>
+      </div>
+      {result && (
+        <div
+          className={cx(
+            "mt-3 border p-3 text-[11px]",
+            result.ok
+              ? "border-ok/30 bg-ok/10 text-ok"
+              : "border-bad/30 bg-bad/10 text-bad",
+          )}
+        >
+          <div className="flex items-center gap-2">
+            {result.ok ? <CheckCircle2 size={13} /> : <CircleAlert size={13} />}
+            <span className="font-heading font-semibold uppercase tracking-brand">
+              HTTP {result.httpStatus} — {result.ok ? "Verified" : "Failed"}
+            </span>
+          </div>
+          {result.shop && (
+            <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-white/80">
+              {JSON.stringify(result.shop, null, 2)}
+            </pre>
+          )}
+          {result.error && (
+            <div className="mt-2 text-white/85">{result.error}</div>
+          )}
         </div>
       )}
     </div>
