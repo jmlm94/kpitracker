@@ -305,7 +305,8 @@ const progress = Object.fromEntries(
         last7: s.last7,
         mtd: s.mtd,
         updatedAt: new Date().toISOString(),
-        samples: buildSamples(s.last7, 14, s.unit),
+        // 400 days of samples so 90/180/365-day views have real data to chew on.
+        samples: buildSamples(s.last7, 400, s.unit),
       },
     ];
   }),

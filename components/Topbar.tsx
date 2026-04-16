@@ -1,13 +1,27 @@
 "use client";
 
-import { RefreshCw, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, CheckCircle2, Save } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 
 export function Topbar() {
   const { state, setProgress } = useStore();
   const [running, setRunning] = useState(false);
   const [flash, setFlash] = useState(false);
+  // "Auto-saved" flash whenever the store state changes (localStorage persist)
+  const [savedFlash, setSavedFlash] = useState(false);
+  const firstPassRef = useRef(true);
+  const saveFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    // Skip the very first render; only flash on subsequent changes
+    if (firstPassRef.current) {
+      firstPassRef.current = false;
+      return;
+    }
+    setSavedFlash(true);
+    if (saveFlashTimerRef.current) clearTimeout(saveFlashTimerRef.current);
+    saveFlashTimerRef.current = setTimeout(() => setSavedFlash(false), 1400);
+  }, [state]);
 
   async function refresh() {
     setRunning(true);
@@ -50,6 +64,11 @@ export function Topbar() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {savedFlash && (
+            <span className="chip border-ok/60 bg-ok/10 text-ok">
+              <Save size={10} /> Saved
+            </span>
+          )}
           {lastUpdated && (
             <span className="hidden font-numeric text-[11px] uppercase tracking-brand text-white/50 md:inline">
               Last sync · {new Date(lastUpdated).toLocaleString()}

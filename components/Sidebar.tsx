@@ -8,8 +8,8 @@ import {
   Users,
   Target,
   Plug,
-  Sparkles,
   Network,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { Wordmark } from "./Logo";
 import { cx } from "@/lib/format";
@@ -19,8 +19,9 @@ const nav = [
   { href: "/departments", label: "Departments", icon: Building2, code: "02" },
   { href: "/team", label: "Team", icon: Users, code: "03" },
   { href: "/kpis", label: "KPIs & Targets", icon: Target, code: "04" },
-  { href: "/integrations", label: "Integrations", icon: Plug, code: "05" },
-  { href: "/org-chart", label: "Org Chart", icon: Network, code: "06" },
+  { href: "/org-chart", label: "Org Chart", icon: Network, code: "05" },
+  { href: "/integrations", label: "Integrations", icon: Plug, code: "06" },
+  { href: "/settings", label: "Settings", icon: SettingsIcon, code: "07" },
 ];
 
 export function Sidebar() {
@@ -73,21 +74,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      <Link
-        href="/onboarding"
-        className="crosshair mt-8 flex items-start gap-3 border border-carbinox/50 bg-carbinox/[0.07] px-3 py-3 text-left transition hover:bg-carbinox/[0.12]"
-      >
-        <Sparkles size={16} className="mt-0.5 shrink-0 text-carbinox" />
-        <div>
-          <div className="font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
-            Onboarding
-          </div>
-          <div className="mt-0.5 text-[11px] text-white/60">
-            Configure departments, KPIs, integrations.
-          </div>
-        </div>
-      </Link>
 
       <div className="mt-auto pt-8 font-heading text-[10px] uppercase tracking-brand text-white/30">
         [ Carbinox Co. ] <span className="text-white/50">Build your outdoor artillery</span>

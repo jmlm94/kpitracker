@@ -14,6 +14,12 @@ import {
   statusLabel,
   statusSolid,
 } from "@/lib/format";
+import {
+  TIMEFRAMES,
+  aggregate,
+  todayValue as tfToday,
+  type Timeframe,
+} from "@/lib/timeframe";
 import { Avatar } from "./Avatar";
 import { TrendingDown, TrendingUp } from "lucide-react";
 
@@ -23,28 +29,39 @@ export function KPICard({
   progress,
   owner,
   deptColor,
+  timeframe,
 }: {
   kpi: KPI;
   target: Target;
   progress?: Progress;
   owner?: TeamMember;
   deptColor?: string;
+  /** When provided, overrides kpi.window for aggregation */
+  timeframe?: Timeframe;
 }) {
-  const actual = progress ? pickProgressValue(kpi, progress) : 0;
+  // If a timeframe is supplied, compute from samples; otherwise fall back to
+  // the KPI's configured window.
+  const actual = timeframe
+    ? aggregate(kpi, progress, timeframe)
+    : progress
+      ? pickProgressValue(kpi, progress)
+      : 0;
   const ratio = progress ? progressRatio(kpi, target, actual) : 0;
   const status = classifyStatus(ratio);
   const pct = Math.min(120, Math.round(ratio * 100));
   const statusColor = statusSolid(status);
 
-  const todayValue = progress?.today ?? 0;
+  const todayValue = progress ? tfToday(progress) : 0;
   const todayBetter =
     kpi.direction === "higher_is_better"
       ? todayValue >= actual
       : todayValue <= actual;
 
   const accent = deptColor || "#f8c808";
-  const windowLabel =
-    kpi.window === "today"
+  const windowLabel = timeframe
+    ? TIMEFRAMES.find((t) => t.value === timeframe)?.label ||
+      kpi.window.toUpperCase()
+    : kpi.window === "today"
       ? "Today"
       : kpi.window === "7d"
         ? "Last 7 Days"
