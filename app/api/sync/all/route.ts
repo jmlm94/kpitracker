@@ -12,7 +12,7 @@ export const runtime = "nodejs";
  * route is stateless — it just runs the connectors.
  */
 export async function POST(req: Request) {
-  let body: Partial<AppState> = {};
+  let body: Partial<AppState> & { credentials?: Record<string, Record<string, string>> } = {};
   try {
     body = await req.json();
   } catch {
@@ -21,13 +21,15 @@ export async function POST(req: Request) {
 
   const kpis = body.kpis || [];
   const targets = body.targets || [];
+  const allCreds = body.credentials || {};
 
   const progress: Record<string, any> = {};
   await Promise.all(
     targets.map(async (t) => {
       const kpi = kpis.find((k) => k.id === t.kpiId);
       if (!kpi) return;
-      const res = await fetchMetric(kpi, t);
+      const creds = allCreds[kpi.provider];
+      const res = await fetchMetric(kpi, t, creds);
       progress[t.id] = {
         today: res.today,
         last7: res.last7,

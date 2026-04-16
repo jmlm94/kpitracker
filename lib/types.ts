@@ -84,6 +84,8 @@ export type IntegrationConfig = {
   connected: boolean;
   /** Only flags we surface in UI — real secrets stay in env vars on Vercel */
   envVarsExpected: string[];
+  /** Client-side credentials entered through the UI (shop, token, etc.) */
+  credentials?: Record<string, string>;
   lastSyncAt?: string;
   lastSyncStatus?: "ok" | "error" | "never";
   lastSyncMessage?: string;

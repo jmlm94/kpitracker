@@ -19,12 +19,20 @@ export type MetricResult = {
  * Dispatches to the correct provider. Each connector is expected to be
  * self-contained — if credentials are missing, it must fall back to
  * `simulated` mode so the UI always has numbers to display.
+ *
+ * `credentials` is an optional bag of key/value pairs sent from the client
+ * (entered via the Integrations page). Connectors check these first, then
+ * fall back to env vars.
  */
-export async function fetchMetric(kpi: KPI, target: Target): Promise<MetricResult> {
+export async function fetchMetric(
+  kpi: KPI,
+  target: Target,
+  credentials?: Record<string, string>,
+): Promise<MetricResult> {
   try {
     switch (kpi.provider) {
       case "shopify":
-        return await fetchShopifyMetric(kpi, target);
+        return await fetchShopifyMetric(kpi, target, credentials);
       case "triplewhale":
         return await fetchTripleWhaleMetric(kpi, target);
       case "klaviyo":

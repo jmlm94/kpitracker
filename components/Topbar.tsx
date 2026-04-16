@@ -26,10 +26,17 @@ export function Topbar() {
   async function refresh() {
     setRunning(true);
     try {
+      // Collect credentials from each integration that has them
+      const credentials: Record<string, Record<string, string>> = {};
+      for (const i of state.integrations) {
+        if (i.credentials && Object.keys(i.credentials).length > 0) {
+          credentials[i.provider] = i.credentials;
+        }
+      }
       const res = await fetch("/api/sync/all", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kpis: state.kpis, targets: state.targets }),
+        body: JSON.stringify({ kpis: state.kpis, targets: state.targets, credentials }),
       });
       const data = (await res.json()) as {
         progress: Record<string, { today: number; last7: number; mtd: number; samples: { date: string; value: number }[] }>;

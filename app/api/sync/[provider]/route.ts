@@ -17,7 +17,7 @@ export async function POST(
   { params }: { params: { provider: string } },
 ) {
   const provider = params.provider;
-  let body: { kpis?: KPI[]; targets?: Target[] } = {};
+  let body: { kpis?: KPI[]; targets?: Target[]; credentials?: Record<string, string> } = {};
   try {
     body = await req.json();
   } catch {
@@ -26,6 +26,7 @@ export async function POST(
 
   const kpis = body.kpis || [];
   const targets = body.targets || [];
+  const credentials = body.credentials;
 
   const filtered = targets.filter((t) => {
     const kpi = kpis.find((k) => k.id === t.kpiId);
@@ -37,7 +38,7 @@ export async function POST(
   await Promise.all(
     filtered.map(async (t) => {
       const kpi = kpis.find((k) => k.id === t.kpiId)!;
-      const res = await fetchMetric(kpi, t);
+      const res = await fetchMetric(kpi, t, credentials);
       progress[t.id] = {
         today: res.today,
         last7: res.last7,
