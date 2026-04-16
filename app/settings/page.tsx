@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { Avatar } from "@/components/Avatar";
 import { cx } from "@/lib/format";
+import { memberDepartmentIds } from "@/lib/hierarchy";
 import { presetsForPosition, type KPIPreset } from "@/lib/presets";
 import type {
+  Department,
   KPI,
   Provider,
   Target,
@@ -13,6 +15,8 @@ import type {
 } from "@/lib/types";
 import {
   Check,
+  ChevronDown,
+  ChevronRight,
   Plus,
   RotateCcw,
   Search,
@@ -37,12 +41,6 @@ const unitOptions: { value: Unit; label: string }[] = [
   { value: "duration_s", label: "Duration (s)" },
 ];
 
-/**
- * Per-person KPI editor. Each card works like a draft — local edits stay on
- * the card until "Save changes" is pressed, which commits them all at once
- * through the store. Dirty cards show an "Unsaved" chip; the Save button is
- * disabled until there's something to save.
- */
 export default function SettingsPage() {
   const { state, ready } = useStore();
   const [query, setQuery] = useState("");
@@ -61,13 +59,13 @@ export default function SettingsPage() {
       <div className="bracket">07 — Settings</div>
       <h1 className="section-title mt-1">Settings</h1>
       <p className="mt-2 text-sm text-white/50">
-        Edit each team member's KPIs. For every KPI you can set:{" "}
-        <b className="text-white">Name · Metric · Target · Source</b>. Press{" "}
-        <b className="text-white">Save changes</b> on a card to commit.
+        Click on any team member to expand and edit their KPIs. For each KPI
+        you set: <b className="text-white">Name · Target · Source</b>. Press{" "}
+        <b className="text-white">Save changes</b> when done.
       </p>
 
       <div className="mt-6 card flex items-end gap-3 p-4">
-        <div className="flex-1">
+        <div className="flex-1 max-w-sm">
           <label className="label">Find a person</label>
           <div className="relative">
             <Search
@@ -87,9 +85,9 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="mt-6 space-y-2">
         {filtered.map((person) => (
-          <PersonKpiEditor key={person.id} personId={person.id} />
+          <PersonRow key={person.id} personId={person.id} />
         ))}
       </div>
     </div>
@@ -97,7 +95,6 @@ export default function SettingsPage() {
 }
 
 type DraftKPI = {
-  /** Existing ids if editing; blank for new ones (generated at save time) */
   kpiId?: string;
   targetId?: string;
   name: string;
@@ -111,7 +108,7 @@ type DraftKPI = {
   removed?: boolean;
 };
 
-function PersonKpiEditor({ personId }: { personId: string }) {
+function PersonRow({ personId }: { personId: string }) {
   const {
     state,
     upsertKPI,
@@ -120,11 +117,84 @@ function PersonKpiEditor({ personId }: { personId: string }) {
     removeTarget,
   } = useStore();
   const person = state.team.find((m) => m.id === personId);
-  const primaryDept = state.departments.find(
-    (d) => d.id === person?.departmentId,
-  );
+  const [open, setOpen] = useState(false);
 
-  // Derive initial draft from current state
+  if (!person) return null;
+
+  const depts = memberDepartmentIds(person)
+    .map((id) => state.departments.find((d) => d.id === id))
+    .filter((d): d is Department => !!d);
+  const primaryDept = state.departments.find((d) => d.id === person.departmentId);
+  const accent = primaryDept?.color || "#f8c808";
+  const kpiCount = state.targets.filter((t) => t.ownerId === person.id).length;
+
+  return (
+    <div className="card">
+      <button
+        onClick={() => setOpen(!open)}
+        className={cx(
+          "flex w-full items-center gap-3 p-4 text-left transition hover:bg-white/[0.02]",
+          open ? "border-b border-white/5" : "",
+        )}
+      >
+        {open ? (
+          <ChevronDown size={14} className="text-carbinox" />
+        ) : (
+          <ChevronRight size={14} className="text-white/40" />
+        )}
+        <Avatar name={person.name} size={36} color={accent} />
+        <div className="min-w-0 flex-1">
+          <div className="font-heading text-[13px] font-semibold uppercase tracking-brand text-white">
+            {person.name}
+          </div>
+          <div className="text-[11px] text-white/50">{person.position}</div>
+        </div>
+        <div className="hidden flex-wrap gap-1 md:flex">
+          {depts.map((d) => (
+            <span
+              key={d.id}
+              className="inline-flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-heading font-semibold uppercase tracking-brand"
+              style={{
+                borderColor: `${d.color}60`,
+                borderStyle: d.id === person.departmentId ? "solid" : "dashed",
+              }}
+            >
+              <span className="h-1 w-1" style={{ background: d.color }} />
+              {d.name}
+            </span>
+          ))}
+        </div>
+        <span className="font-numeric text-[11px] text-white/50">
+          {kpiCount} KPI{kpiCount === 1 ? "" : "s"}
+        </span>
+      </button>
+
+      {open && (
+        <PersonKpiEditor
+          personId={personId}
+          accent={accent}
+        />
+      )}
+    </div>
+  );
+}
+
+function PersonKpiEditor({
+  personId,
+  accent,
+}: {
+  personId: string;
+  accent: string;
+}) {
+  const {
+    state,
+    upsertKPI,
+    removeKPI,
+    upsertTarget,
+    removeTarget,
+  } = useStore();
+  const person = state.team.find((m) => m.id === personId);
+
   const initial = useMemo<DraftKPI[]>(() => {
     if (!person) return [];
     const out: DraftKPI[] = [];
@@ -149,21 +219,13 @@ function PersonKpiEditor({ personId }: { personId: string }) {
   }, [state.kpis, state.targets, person?.id]);
 
   const [draft, setDraft] = useState<DraftKPI[]>(initial);
-  const [revision, setRevision] = useState(0); // used to reset draft
-
-  // When the underlying state changes (e.g. someone else adds a KPI),
-  // re-seed the draft but only if we haven't diverged yet.
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
-
-  // Reset draft when initial changes and draft hasn't been edited
-  if (!dirty && initial.length !== draft.length) {
-    // length mismatch after a save or external change → sync
-    setDraft(initial);
-  }
+  const [flash, setFlash] = useState(false);
 
   if (!person) return null;
 
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const presets = presetsForPosition(person.position);
+  const visibleRows = draft.filter((r) => !r.removed);
 
   function update(index: number, patch: Partial<DraftKPI>) {
     setDraft((d) => d.map((r, i) => (i === index ? { ...r, ...patch } : r)));
@@ -201,19 +263,17 @@ function PersonKpiEditor({ personId }: { personId: string }) {
 
   function save() {
     if (!person) return;
-    // 1. Remove rows that were marked removed (matching real kpi/target ids)
     draft
       .filter((r) => r.removed && r.targetId)
       .forEach((r) => {
         if (r.targetId) removeTarget(r.targetId);
         if (r.kpiId) {
-          const otherTargets = state.targets.filter(
+          const others = state.targets.filter(
             (t) => t.kpiId === r.kpiId && t.id !== r.targetId,
           );
-          if (otherTargets.length === 0) removeKPI(r.kpiId);
+          if (others.length === 0) removeKPI(r.kpiId);
         }
       });
-    // 2. Upsert the remaining rows (create or update)
     draft
       .filter((r) => !r.removed)
       .forEach((r) => {
@@ -242,66 +302,74 @@ function PersonKpiEditor({ personId }: { personId: string }) {
     setTimeout(() => setFlash(false), 1600);
   }
 
-  function resetDraft() {
-    setDraft(initial);
-    setRevision((r) => r + 1);
-  }
-
-  const [flash, setFlash] = useState(false);
-  const accent = primaryDept?.color || "#f8c808";
-  const visibleRows = draft.filter((r) => !r.removed);
-
   return (
-    <div className="card relative p-4">
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-[2px]"
-        style={{ background: accent }}
-      />
-      <div className="flex items-start gap-3">
-        <Avatar name={person.name} size={40} color={accent} />
-        <div className="min-w-0 flex-1">
-          <div className="font-display text-xl font-extrabold uppercase leading-none tracking-brand text-white">
-            {person.name}
-          </div>
-          <div className="mt-1 text-[12px] text-white/55">{person.position}</div>
-        </div>
-        {dirty && (
-          <span className="chip border-carbinox/60 bg-carbinox/10 text-carbinox">
-            Unsaved
-          </span>
-        )}
-        {flash && (
-          <span className="chip border-ok/60 bg-ok/10 text-ok">
-            <Check size={10} /> Saved
-          </span>
-        )}
-      </div>
-
+    <div className="p-4">
       {/* KPI rows */}
-      <div className="mt-4 space-y-2">
+      <div className="space-y-2">
         {visibleRows.length === 0 && (
           <div className="border border-dashed border-white/10 px-3 py-3 text-[12px] text-white/40">
-            No KPIs. Add one from the presets below or click "Custom KPI".
+            No KPIs. Use a preset below or add a custom one.
           </div>
         )}
         {draft.map((row, idx) =>
           row.removed ? null : (
-            <KpiRowEditor
+            <div
               key={idx}
-              row={row}
-              onChange={(patch) => update(idx, patch)}
-              onRemove={() => removeRow(idx)}
-            />
+              className="grid grid-cols-12 items-center gap-1.5 border border-white/10 bg-jet-900 p-2"
+            >
+              <input
+                value={row.name}
+                onChange={(e) => update(idx, { name: e.target.value })}
+                className="col-span-5 bg-transparent font-heading text-[12px] font-semibold uppercase tracking-brand text-white outline-none"
+                placeholder="KPI name"
+              />
+              <input
+                type="number"
+                step="any"
+                value={row.target}
+                onChange={(e) => update(idx, { target: Number(e.target.value) })}
+                className="input col-span-2 px-1.5 py-1 text-right font-numeric text-[12px]"
+                placeholder="Target"
+              />
+              <select
+                value={row.provider}
+                onChange={(e) => update(idx, { provider: e.target.value as Provider })}
+                className="input col-span-3 px-1.5 py-1 text-[11px]"
+                title="Source"
+              >
+                {providerOptions.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={row.unit}
+                onChange={(e) => update(idx, { unit: e.target.value as Unit })}
+                className="input col-span-1 px-1 py-1 text-[10px]"
+              >
+                {unitOptions.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => removeRow(idx)}
+                className="col-span-1 justify-self-end text-white/30 hover:text-bad"
+                title="Remove KPI"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
           ),
         )}
       </div>
 
       {/* Add controls */}
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {presets.length > 0 && (
           <select
-            key={revision}
             defaultValue=""
             onChange={(e) => {
               const idx = Number(e.target.value);
@@ -326,8 +394,18 @@ function PersonKpiEditor({ personId }: { personId: string }) {
 
       {/* Save / Reset */}
       <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/5 pt-3">
+        {flash && (
+          <span className="chip border-ok/60 bg-ok/10 text-ok">
+            <Check size={10} /> Saved
+          </span>
+        )}
+        {dirty && (
+          <span className="chip border-carbinox/60 bg-carbinox/10 text-carbinox">
+            Unsaved
+          </span>
+        )}
         <button
-          onClick={resetDraft}
+          onClick={() => setDraft(initial)}
           disabled={!dirty}
           className="btn-ghost disabled:opacity-40"
         >
@@ -340,98 +418,6 @@ function PersonKpiEditor({ personId }: { personId: string }) {
         >
           <Check size={12} /> Save changes
         </button>
-      </div>
-    </div>
-  );
-}
-
-function KpiRowEditor({
-  row,
-  onChange,
-  onRemove,
-}: {
-  row: DraftKPI;
-  onChange: (patch: Partial<DraftKPI>) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="grid grid-cols-12 items-center gap-1.5 border border-white/10 bg-jet-900 p-2">
-      <input
-        value={row.name}
-        onChange={(e) => onChange({ name: e.target.value })}
-        className="col-span-4 bg-transparent font-heading text-[12px] font-semibold uppercase tracking-brand text-white outline-none"
-        placeholder="KPI name"
-      />
-      <input
-        value={row.metricKey}
-        onChange={(e) => onChange({ metricKey: e.target.value })}
-        className="input col-span-3 px-1.5 py-1 font-numeric text-[11px]"
-        placeholder="metric.key"
-        title="Metric (the exact field name in the data source)"
-      />
-      <input
-        type="number"
-        step="any"
-        value={row.target}
-        onChange={(e) => onChange({ target: Number(e.target.value) })}
-        className="input col-span-2 px-1.5 py-1 text-right font-numeric text-[12px]"
-        placeholder="Target"
-      />
-      <select
-        value={row.provider}
-        onChange={(e) => onChange({ provider: e.target.value as Provider })}
-        className="input col-span-2 px-1.5 py-1 text-[11px]"
-        title="Source — where to measure it"
-      >
-        {providerOptions.map((p) => (
-          <option key={p.value} value={p.value}>
-            {p.label}
-          </option>
-        ))}
-      </select>
-      <button
-        onClick={onRemove}
-        className="col-span-1 justify-self-end text-white/30 hover:text-bad"
-        title="Remove KPI"
-      >
-        <Trash2 size={12} />
-      </button>
-      {/* Second row: unit + direction + window */}
-      <div className="col-span-12 mt-1 flex flex-wrap items-center gap-2 text-[10px] text-white/45">
-        <span className="bracket">Unit</span>
-        <select
-          value={row.unit}
-          onChange={(e) => onChange({ unit: e.target.value as Unit })}
-          className="bg-transparent text-white/70 outline-none"
-        >
-          {unitOptions.map((u) => (
-            <option key={u.value} value={u.value}>
-              {u.label}
-            </option>
-          ))}
-        </select>
-        <span className="bracket ml-2">Direction</span>
-        <select
-          value={row.direction}
-          onChange={(e) =>
-            onChange({ direction: e.target.value as KPI["direction"] })
-          }
-          className="bg-transparent text-white/70 outline-none"
-        >
-          <option value="higher_is_better">↑ Higher is better</option>
-          <option value="lower_is_better">↓ Lower is better</option>
-        </select>
-        <span className="bracket ml-2">Window</span>
-        <select
-          value={row.window}
-          onChange={(e) => onChange({ window: e.target.value as KPI["window"] })}
-          className="bg-transparent text-white/70 outline-none"
-        >
-          <option value="today">Today</option>
-          <option value="7d">Last 7 days</option>
-          <option value="mtd">Month-to-date</option>
-          <option value="30d">Last 30 days</option>
-        </select>
       </div>
     </div>
   );

@@ -4,82 +4,75 @@ import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { Avatar } from "@/components/Avatar";
 import {
+  classifyStatus,
+  pickProgressValue,
+  progressRatio,
+  statusSolid,
+} from "@/lib/format";
+import {
   childDepartments,
   membersOfDepartment,
   targetsForDepartment,
 } from "@/lib/hierarchy";
+import type { Department, AppState, TeamMember } from "@/lib/types";
 
 export default function DepartmentsPage() {
   const { state, ready } = useStore();
   if (!ready) return null;
+
   const mains = state.departments.filter((d) => d.kind === "main");
-  const subs = state.departments.filter((d) => d.kind === "sub");
 
   return (
     <div>
       <div className="bracket">02 — The Machine</div>
       <h1 className="section-title mt-1">Departments</h1>
       <p className="mt-2 text-sm text-white/50">
-        Who's in each team and how many KPIs they own. Main departments group
-        their sub-departments below.
+        The full Carbinox hierarchy, one department at a time.
       </p>
 
-      {/* Main departments */}
-      <section className="mt-8">
-        <div className="bracket">Main Departments ({mains.length})</div>
-        <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {mains.map((d) => (
-            <DeptInfoCard key={d.id} id={d.id} />
-          ))}
-        </div>
-      </section>
-
-      {/* Sub-departments grouped by parent */}
-      <section className="mt-12">
-        <div className="bracket">Sub-Departments ({subs.length})</div>
-        <div className="mt-3 space-y-8">
-          {mains.map((main) => {
-            const children = childDepartments(state, main.id);
-            if (children.length === 0) return null;
-            return (
-              <div key={main.id}>
-                <div className="mb-3 flex items-center gap-2">
-                  <span
-                    className="inline-block h-3 w-3"
-                    style={{ background: main.color }}
-                  />
-                  <span className="font-heading text-[12px] font-semibold uppercase tracking-brand text-white/70">
-                    {main.name}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {children.map((s) => (
-                    <DeptInfoCard key={s.id} id={s.id} />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <div className="mt-8 space-y-8">
+        {mains.map((main, mainIdx) => {
+          const prefix = `${mainIdx + 1}`;
+          const subs = childDepartments(state, main.id);
+          return (
+            <div key={main.id}>
+              <DeptBlock dept={main} prefix={prefix} state={state} />
+              {subs.map((sub, subIdx) => (
+                <DeptBlock
+                  key={sub.id}
+                  dept={sub}
+                  prefix={`${prefix}.${subIdx + 1}`}
+                  state={state}
+                  indent={1}
+                />
+              ))}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function DeptInfoCard({ id }: { id: string }) {
-  const { state } = useStore();
-  const dept = state.departments.find((d) => d.id === id);
-  if (!dept) return null;
-
-  const members = membersOfDepartment(state, id);
-  const targets = targetsForDepartment(state, id);
+function DeptBlock({
+  dept,
+  prefix,
+  state,
+  indent = 0,
+}: {
+  dept: Department;
+  prefix: string;
+  state: AppState;
+  indent?: number;
+}) {
+  const members = membersOfDepartment(state, dept.id);
+  const targets = targetsForDepartment(state, dept.id);
   const head = state.team.find((m) => m.id === dept.headId);
-  const others = members.filter((m) => m.id !== head?.id);
 
   return (
-    <Link
-      href={`/departments/${id}`}
-      className="card card-hover relative block p-5"
+    <div
+      className="card mt-3 p-5"
+      style={{ marginLeft: indent * 24 }}
     >
       <div
         aria-hidden
@@ -87,74 +80,120 @@ function DeptInfoCard({ id }: { id: string }) {
         style={{ background: dept.color }}
       />
       <div className="flex items-start gap-3">
-        <div
-          className="h-10 w-10 shrink-0 border border-white/10"
-          style={{ background: dept.color }}
-        />
+        <span className="font-numeric text-[13px] font-bold text-carbinox">
+          {prefix}
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="bracket">
-            {dept.kind === "main" ? "Main" : "Sub-department"}
-          </div>
-          <h3 className="mt-1 font-display text-2xl font-extrabold uppercase leading-none tracking-brand text-white">
+          <Link
+            href={`/departments/${dept.id}`}
+            className="font-display text-2xl font-extrabold uppercase leading-none tracking-brand text-white hover:text-carbinox"
+          >
             {dept.name}
-          </h3>
+          </Link>
+          <div className="mt-1 font-numeric text-[11px] uppercase tracking-brand text-white/50">
+            {dept.kind === "main" ? "Main" : "Sub-department"} ·{" "}
+            {members.length} people · {targets.length} KPIs
+          </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <Stat label="People" value={members.length} />
-        <Stat label="KPIs" value={targets.length} />
-      </div>
-
       {/* Head */}
-      <div className="mt-4 border-t border-white/5 pt-3">
-        <div className="bracket">Head</div>
-        {head ? (
+      {head && (
+        <div className="mt-4 border-t border-white/5 pt-3">
+          <div className="bracket">Head</div>
           <div className="mt-1.5 flex items-center gap-2.5">
-            <Avatar name={head.name} size={28} color={dept.color} />
-            <div className="leading-tight">
+            <Avatar name={head.name} size={30} color={dept.color} />
+            <Link
+              href={`/team/${head.id}`}
+              className="leading-tight hover:text-carbinox"
+            >
               <div className="font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
                 {head.name}
               </div>
               <div className="text-[11px] text-white/50">{head.position}</div>
-            </div>
+            </Link>
           </div>
-        ) : (
-          <div className="mt-1 text-[11px] text-warn">No head assigned</div>
-        )}
-      </div>
-
-      {/* Other members */}
-      {others.length > 0 && (
-        <div className="mt-4 border-t border-white/5 pt-3">
-          <div className="bracket">Team ({others.length})</div>
-          <ul className="mt-1.5 space-y-0.5 text-[12px] text-white/70">
-            {others.slice(0, 8).map((m) => (
-              <li key={m.id} className="truncate">
-                {m.name}
-                <span className="ml-1 text-white/40">· {m.position}</span>
-              </li>
-            ))}
-            {others.length > 8 && (
-              <li className="text-[11px] text-white/40">
-                +{others.length - 8} more…
-              </li>
-            )}
-          </ul>
         </div>
       )}
-    </Link>
+
+      {/* Team members with progress bars */}
+      {members.length > 0 && (
+        <div className="mt-4 border-t border-white/5 pt-3">
+          <div className="bracket">Team ({members.length})</div>
+          <div className="mt-2 space-y-2">
+            {members.map((m) => (
+              <PersonProgressRow
+                key={m.id}
+                person={m}
+                state={state}
+                deptColor={dept.color}
+                isHead={m.id === head?.id}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function PersonProgressRow({
+  person,
+  state,
+  deptColor,
+  isHead,
+}: {
+  person: TeamMember;
+  state: AppState;
+  deptColor: string;
+  isHead?: boolean;
+}) {
+  const targets = state.targets.filter((t) => t.ownerId === person.id);
+  let sum = 0;
+  let count = 0;
+  targets.forEach((t) => {
+    const kpi = state.kpis.find((k) => k.id === t.kpiId);
+    const p = state.progress[t.id];
+    if (!kpi || !p) return;
+    sum += Math.min(1.2, progressRatio(kpi, t, pickProgressValue(kpi, p)));
+    count++;
+  });
+  const avg = count ? sum / count : 0;
+  const status = classifyStatus(avg);
+  const pct = Math.min(100, Math.round(avg * 100));
+  const fillColor = statusSolid(status);
+
   return (
-    <div className="border border-white/5 bg-white/[0.02] p-2 text-center">
-      <div className="font-numeric text-xl font-bold text-white">{value}</div>
-      <div className="font-heading text-[9px] font-semibold uppercase tracking-brand text-white/45">
-        {label}
+    <Link
+      href={`/team/${person.id}`}
+      className="flex items-center gap-3 border border-white/5 bg-white/[0.02] px-3 py-2 transition hover:border-white/10 hover:bg-white/[0.04]"
+    >
+      <Avatar name={person.name} size={28} color={deptColor} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
+            {person.name}
+          </span>
+          {isHead && (
+            <span className="chip border-carbinox/40 bg-carbinox/10 text-carbinox px-1 py-0 text-[9px]">
+              Head
+            </span>
+          )}
+        </div>
+        <div className="text-[10px] text-white/45">{person.position}</div>
+        {/* Progress bar */}
+        <div className="mt-1.5 flex items-center gap-2">
+          <div className="h-1.5 flex-1 border border-white/5 bg-white/[0.03]">
+            <div
+              className="h-full transition-[width] duration-500"
+              style={{ width: `${pct}%`, background: fillColor }}
+            />
+          </div>
+          <span className="font-numeric text-[10px] font-semibold" style={{ color: fillColor }}>
+            {pct}%
+          </span>
+        </div>
       </div>
-    </div>
+    </Link>
   );
 }

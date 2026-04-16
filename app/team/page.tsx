@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { Avatar } from "@/components/Avatar";
 import {
   classifyStatus,
+  cx,
   pickProgressValue,
   progressRatio,
   statusBg,
@@ -51,7 +52,7 @@ export default function TeamPage() {
                   <div className="bracket">{main.name} · direct team</div>
                   <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {directMembers.map((m) => (
-                      <TeamCard key={m.id} id={m.id} deptColor={main.color} />
+                      <TeamCard key={m.id} id={m.id} deptColor={main.color} isHead={m.id === main.headId} />
                     ))}
                   </div>
                 </div>
@@ -79,7 +80,7 @@ export default function TeamPage() {
                     </div>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                       {subMembers.map((m) => (
-                        <TeamCard key={m.id} id={m.id} deptColor={sub.color} />
+                        <TeamCard key={m.id} id={m.id} deptColor={sub.color} isHead={m.id === sub.headId} />
                       ))}
                     </div>
                   </div>
@@ -93,7 +94,7 @@ export default function TeamPage() {
   );
 }
 
-function TeamCard({ id, deptColor }: { id: string; deptColor?: string }) {
+function TeamCard({ id, deptColor, isHead }: { id: string; deptColor?: string; isHead?: boolean }) {
   const { state } = useStore();
   const m = state.team.find((t) => t.id === id);
   if (!m) return null;
@@ -112,12 +113,22 @@ function TeamCard({ id, deptColor }: { id: string; deptColor?: string }) {
   return (
     <Link
       href={`/team/${m.id}`}
-      className="card card-hover flex items-center gap-3 p-3"
+      className={cx(
+        "card card-hover flex items-center gap-3 p-3",
+        isHead ? "border-carbinox/40" : "",
+      )}
     >
       <Avatar name={m.name} color={deptColor} size={42} />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-heading text-[13px] font-semibold uppercase tracking-brand text-white">
-          {m.name}
+        <div className="flex items-center gap-2">
+          <span className="truncate font-heading text-[13px] font-semibold uppercase tracking-brand text-white">
+            {m.name}
+          </span>
+          {isHead && (
+            <span className="chip border-carbinox/40 bg-carbinox/10 text-carbinox px-1 py-0 text-[9px]">
+              Head
+            </span>
+          )}
         </div>
         <div className="truncate text-[11px] text-white/50">{m.position}</div>
         <div className="mt-1 font-numeric text-[10px] uppercase tracking-brand text-white/40">
