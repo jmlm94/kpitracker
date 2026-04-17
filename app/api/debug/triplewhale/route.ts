@@ -17,7 +17,7 @@ export async function GET() {
 
   const baseUrl = "https://api.triplewhale.com/api/v2";
 
-  const tests = [
+  const tests: { name: string; url: string; method: string; headers: Record<string, string>; body?: any }[] = [
     // Common auth exchange patterns
     { name: "auth-api-keys-exchange", url: `${baseUrl}/auth/api-keys/exchange`, method: "POST", headers: { "Content-Type": "application/json" }, body: { apiKey } },
     { name: "auth-token", url: `${baseUrl}/auth/token`, method: "POST", headers: { "Content-Type": "application/json" }, body: { api_key: apiKey, shopDomain: shopId } },
