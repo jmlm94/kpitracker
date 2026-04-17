@@ -6,6 +6,7 @@ import { KPICard } from "@/components/KPICard";
 import { DepartmentCard } from "@/components/DepartmentCard";
 import { TimeframeSelector } from "@/components/TimeframeSelector";
 import { ShopifyLiveSection } from "@/components/ShopifyLiveSection";
+import { TripleWhaleLiveSection } from "@/components/TripleWhaleLiveSection";
 import {
   classifyStatus,
   progressRatio,
@@ -98,6 +99,9 @@ export default function DashboardPage() {
 
       {/* Shopify Live */}
       <ShopifyLiveSection timeframe={timeframe} />
+
+      {/* Triple Whale Live */}
+      <TripleWhaleLiveSection timeframe={timeframe} />
 
       {/* Departments */}
       <section className="mt-10">

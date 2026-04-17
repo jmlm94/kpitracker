@@ -14,6 +14,7 @@ import {
   Save,
   ShieldCheck,
   ShoppingBag,
+  Zap,
 } from "lucide-react";
 import { cx } from "@/lib/format";
 
@@ -139,10 +140,13 @@ export default function IntegrationsPage() {
         />
       )}
 
+      {/* Triple Whale — featured card */}
+      <TripleWhaleCard />
+
       {/* Other integrations — standard cards */}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         {state.integrations
-          .filter((i) => i.provider !== "shopify")
+          .filter((i) => i.provider !== "shopify" && i.provider !== "triplewhale")
           .map((i) => {
             const ok = i.lastSyncStatus === "ok";
             const err = i.lastSyncStatus === "error";
@@ -513,6 +517,171 @@ function SyncMessage({
     >
       {ok ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}
       {message}
+    </div>
+  );
+}
+
+function TripleWhaleCard() {
+  const { state, updateIntegration } = useStore();
+  const tw = state.integrations.find((i) => i.provider === "triplewhale");
+  const creds = tw?.credentials || {};
+  const [apiKey, setApiKey] = useState(creds.TRIPLEWHALE_API_KEY || "");
+  const [shopId, setShopId] = useState(
+    creds.TRIPLEWHALE_SHOP_ID ||
+    creds.SHOPIFY_SHOP ||
+    state.integrations.find((i) => i.provider === "shopify")?.credentials?.SHOPIFY_SHOP ||
+    "",
+  );
+  const [showKey, setShowKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  function save() {
+    updateIntegration("triplewhale", {
+      connected: true,
+      credentials: {
+        TRIPLEWHALE_API_KEY: apiKey.trim(),
+        TRIPLEWHALE_SHOP_ID: shopId.trim(),
+      },
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  async function test() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/triplewhale/summary", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          credentials: {
+            TRIPLEWHALE_API_KEY: apiKey.trim(),
+            TRIPLEWHALE_SHOP_ID: shopId.trim(),
+          },
+        }),
+      });
+      const data = await res.json();
+      setTestResult(
+        data.source === "live"
+          ? "Connected — live data received."
+          : data.note || "Simulated — check credentials.",
+      );
+    } catch (e: any) {
+      setTestResult(`Error: ${e?.message || "Network error"}`);
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const ready = !!(apiKey && shopId);
+
+  return (
+    <div className="card mt-6 p-6">
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[2px] bg-[#4f46e5]"
+      />
+      <div className="flex items-start gap-4">
+        <div className="bg-[#4f46e5]/15 p-3 text-[#4f46e5]">
+          <Zap size={22} />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h2 className="font-display text-2xl font-extrabold uppercase tracking-brand text-white">
+              Triple Whale
+            </h2>
+            {tw?.connected && ready && (
+              <span className="chip border-ok/60 bg-ok/10 text-ok">
+                <CheckCircle2 size={10} /> Connected
+              </span>
+            )}
+            {saved && (
+              <span className="chip border-ok/60 bg-ok/10 text-ok">
+                <Save size={10} /> Saved
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-white/55">
+            ROAS, CPA, CTR, spend, and revenue across Meta, Google, TikTok,
+            Snap, and AppLovin.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 card bg-white/[0.02] p-4">
+        <div className="bracket">How to get your API key</div>
+        <ol className="mt-2 space-y-1.5 text-[13px] text-white/65 list-decimal list-inside">
+          <li>Go to <b className="text-white">Triple Whale → Settings → API</b></li>
+          <li>Click <b className="text-white">Generate API Key</b> (or copy existing)</li>
+          <li>Paste it below</li>
+        </ol>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label className="label">Shop domain</label>
+          <input
+            value={shopId}
+            onChange={(e) => setShopId(e.target.value)}
+            placeholder="carbinox.myshopify.com"
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="label">API Key</label>
+          <div className="relative">
+            <input
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              type={showKey ? "text" : "password"}
+              placeholder="tw_api_xxxxxxxxxxxxxxxx"
+              className="input pr-10"
+            />
+            <button
+              onClick={() => setShowKey(!showKey)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+              type="button"
+            >
+              {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button onClick={save} disabled={!ready} className="btn-primary disabled:opacity-40">
+          <Save size={13} /> Save credentials
+        </button>
+        <button
+          onClick={test}
+          disabled={!ready || testing}
+          className="btn-ghost disabled:opacity-40"
+        >
+          <RefreshCw size={13} className={testing ? "animate-spin" : ""} />
+          {testing ? "Testing…" : "Test sync"}
+        </button>
+      </div>
+
+      {testResult && (
+        <div
+          className={cx(
+            "mt-3 flex items-center gap-2 border p-2.5 text-[12px]",
+            testResult.startsWith("Connected")
+              ? "border-ok/30 bg-ok/10 text-ok"
+              : "border-bad/30 bg-bad/10 text-bad",
+          )}
+        >
+          {testResult.startsWith("Connected") ? (
+            <CheckCircle2 size={14} />
+          ) : (
+            <CircleAlert size={14} />
+          )}
+          {testResult}
+        </div>
+      )}
     </div>
   );
 }

@@ -34,7 +34,7 @@ export async function fetchMetric(
       case "shopify":
         return await fetchShopifyMetric(kpi, target, credentials);
       case "triplewhale":
-        return await fetchTripleWhaleMetric(kpi, target);
+        return await fetchTripleWhaleMetric(kpi, target, credentials);
       case "klaviyo":
         return await fetchKlaviyoMetric(kpi, target);
       case "postscript":
