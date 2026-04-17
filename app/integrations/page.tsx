@@ -1,944 +1,321 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useStore } from "@/lib/store";
 import {
   CheckCircle2,
   CircleAlert,
+  Copy,
   ExternalLink,
-  Eye,
-  EyeOff,
-  HelpCircle,
-  Plug,
   RefreshCw,
-  Save,
   ShieldCheck,
-  ShoppingBag,
-  Zap,
 } from "lucide-react";
 import { cx } from "@/lib/format";
 
-const SHOPIFY_SCOPES = [
-  "read_orders",
-  "read_products",
-  "read_inventory",
-  "read_fulfillments",
-  "read_analytics",
-];
+type StatusResponse = Record<
+  string,
+  { envReady: boolean; envVarsSet: string[]; envVarsMissing: string[] }
+>;
+
+const PROVIDERS = [
+  {
+    id: "shopify",
+    label: "Shopify",
+    color: "#96bf48",
+    purpose: "Orders, revenue, AOV, returns, fulfillment SLA",
+    getKeyUrl: "https://admin.shopify.com/store/YOUR-STORE/settings/apps/development",
+    instructions: [
+      "Go to Shopify admin → Settings → Apps → Develop apps",
+      "Create a custom app (or use the existing one)",
+      "Configure Admin API scopes: read_orders, read_products, read_inventory, read_fulfillments, read_analytics",
+      "Install the app → copy the Admin API access token (starts with shpat_)",
+    ],
+    vars: [
+      { name: "SHOPIFY_SHOP", placeholder: "carbinox.myshopify.com" },
+      { name: "SHOPIFY_ADMIN_TOKEN", placeholder: "shpat_xxxxxxxxxxxxxxxxxxxx" },
+    ],
+  },
+  {
+    id: "triplewhale",
+    label: "Triple Whale",
+    color: "#4f46e5",
+    purpose: "ROAS, CPA, CTR, spend, revenue by ad channel",
+    getKeyUrl: "https://app.triplewhale.com/settings/api",
+    instructions: [
+      "Log into Triple Whale",
+      "Go to Settings → API (or Account → Developer)",
+      "Generate an API Key",
+    ],
+    vars: [
+      { name: "TRIPLEWHALE_API_KEY", placeholder: "tw_api_xxxxxxxxxx" },
+      { name: "TRIPLEWHALE_SHOP_ID", placeholder: "carbinox.myshopify.com" },
+    ],
+  },
+  {
+    id: "klaviyo",
+    label: "Klaviyo",
+    color: "#d43ab0",
+    purpose: "Email revenue, open rate, click rate, flows attribution",
+    getKeyUrl: "https://www.klaviyo.com/settings/account/api-keys",
+    instructions: [
+      "Log into Klaviyo",
+      "Go to Settings → API Keys",
+      "Create a Private API Key with at least Read access to Campaigns, Flows, Metrics",
+    ],
+    vars: [{ name: "KLAVIYO_PRIVATE_KEY", placeholder: "pk_xxxxxxxxxxxxxxxx" }],
+  },
+  {
+    id: "postscript",
+    label: "Postscript",
+    color: "#ff4b4b",
+    purpose: "SMS revenue, CTR, opt-out rate",
+    getKeyUrl: "https://app.postscript.io/settings/api",
+    instructions: [
+      "Log into Postscript",
+      "Go to Settings → API",
+      "Generate an API Key",
+    ],
+    vars: [{ name: "POSTSCRIPT_API_KEY", placeholder: "ps_xxxxxxxxxxxxxxxx" }],
+  },
+  {
+    id: "zendesk",
+    label: "Zendesk",
+    color: "#03363d",
+    purpose: "First response time, CSAT, resolution rate, ticket volume",
+    getKeyUrl: "https://support.zendesk.com/admin/apps-integrations/apis/zendesk-api/settings/tokens/",
+    instructions: [
+      "Go to Zendesk Admin → Apps and integrations → APIs → Zendesk API",
+      "Enable Token access, then Add API Token",
+      "Copy the token; also note your subdomain (the part before .zendesk.com)",
+    ],
+    vars: [
+      { name: "ZENDESK_SUBDOMAIN", placeholder: "carbinox" },
+      { name: "ZENDESK_EMAIL", placeholder: "admin@carbinox.com" },
+      { name: "ZENDESK_API_TOKEN", placeholder: "xxxxxxxxxxxxxxxxxx" },
+    ],
+  },
+  {
+    id: "gsheets",
+    label: "Google Sheets",
+    color: "#0f9d58",
+    purpose: "Manual KPIs (creative win rates, content calendar, anything custom)",
+    getKeyUrl: "https://console.cloud.google.com/iam-admin/serviceaccounts",
+    instructions: [
+      "Google Cloud Console → IAM → Service Accounts → Create service account",
+      "Grant it the 'Editor' role for the Sheets API",
+      "Create a JSON key → copy the client_email and private_key",
+      "Share each sheet you want to read with the client_email",
+    ],
+    vars: [
+      { name: "GOOGLE_SHEETS_CLIENT_EMAIL", placeholder: "...@...iam.gserviceaccount.com" },
+      { name: "GOOGLE_SHEETS_PRIVATE_KEY", placeholder: "-----BEGIN PRIVATE KEY-----\\n..." },
+    ],
+  },
+] as const;
 
 export default function IntegrationsPage() {
-  const { state, ready, updateIntegration, setProgress } = useStore();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [oauthNotice, setOauthNotice] = useState<{ ok: boolean; message: string } | null>(null);
+  const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copiedVar, setCopiedVar] = useState<string | null>(null);
 
-  // Handle the ?shopify_installed=1&token=&shop= redirect from OAuth callback
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
-    const shop = params.get("shop");
-    const err = params.get("shopify_error");
-    if (err) {
-      setOauthNotice({ ok: false, message: err });
-      const clean = new URL(window.location.href);
-      ["shopify_error", "shopify_installed", "token", "shop", "scope"].forEach((k) =>
-        clean.searchParams.delete(k),
-      );
-      window.history.replaceState({}, "", clean.toString());
-      return;
-    }
-    if (token && shop) {
-      updateIntegration("shopify", {
-        connected: true,
-        credentials: {
-          SHOPIFY_SHOP: shop,
-          SHOPIFY_ADMIN_TOKEN: token,
-        },
-        lastSyncStatus: "ok",
-        lastSyncMessage: `Installed on ${shop}`,
-        lastSyncAt: new Date().toISOString(),
-      });
-      setOauthNotice({ ok: true, message: `Successfully installed on ${shop}` });
-      const clean = new URL(window.location.href);
-      ["shopify_installed", "token", "shop", "scope"].forEach((k) =>
-        clean.searchParams.delete(k),
-      );
-      window.history.replaceState({}, "", clean.toString());
-    }
-  }, [updateIntegration]);
-
-  if (!ready) return null;
-
-  async function testSync(provider: string) {
-    setBusy(provider);
+  async function load() {
+    setLoading(true);
     try {
-      const integration = state.integrations.find((i) => i.provider === provider);
-      const res = await fetch(`/api/sync/${provider}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          kpis: state.kpis,
-          targets: state.targets,
-          credentials: integration?.credentials,
-        }),
-      });
+      const res = await fetch("/api/integrations/status");
       const data = await res.json();
-      const now = new Date().toISOString();
-      if (data?.progress) {
-        Object.entries<any>(data.progress).forEach(([tid, p]) => {
-          setProgress(tid, { ...p, targetId: tid, updatedAt: now });
-        });
-      }
-      updateIntegration(provider, {
-        lastSyncAt: now,
-        lastSyncStatus: data?.ok ? "ok" : "error",
-        lastSyncMessage: data?.message || (data?.ok ? "Synced" : "Sync failed"),
-      });
-    } catch (e: any) {
-      updateIntegration(provider, {
-        lastSyncAt: new Date().toISOString(),
-        lastSyncStatus: "error",
-        lastSyncMessage: e?.message || "Network error",
-      });
+      setStatus(data);
     } finally {
-      setBusy(null);
+      setLoading(false);
     }
   }
 
-  const shopify = state.integrations.find((i) => i.provider === "shopify");
+  useEffect(() => {
+    load();
+  }, []);
+
+  function copy(text: string) {
+    navigator.clipboard.writeText(text);
+    setCopiedVar(text);
+    setTimeout(() => setCopiedVar(null), 1200);
+  }
+
+  const connectedCount = status
+    ? Object.values(status).filter((s) => s.envReady).length
+    : 0;
 
   return (
     <div>
       <div className="bracket">06 — Data Feeds</div>
       <h1 className="section-title mt-1">Integrations</h1>
-      <p className="mt-2 text-sm text-white/50">
-        Connect Carbinox's data sources. Enter credentials below or set
-        environment variables in Vercel for production.
+      <p className="mt-2 max-w-2xl text-sm text-white/50">
+        Credentials are set as Vercel environment variables so connections
+        persist forever — no browser storage, no UI clicks, and the daily cron
+        always has access.
       </p>
 
-      {oauthNotice && (
-        <div
-          className={cx(
-            "mt-4 flex items-center gap-2 border p-3 text-[12px]",
-            oauthNotice.ok
-              ? "border-ok/30 bg-ok/10 text-ok"
-              : "border-bad/30 bg-bad/10 text-bad",
-          )}
-        >
-          {oauthNotice.ok ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}
-          {oauthNotice.message}
-        </div>
-      )}
-
-      {/* Shopify — featured card with full setup flow */}
-      {shopify && (
-        <ShopifyCard
-          integration={shopify}
-          updateIntegration={updateIntegration}
-          testSync={() => testSync("shopify")}
-          busy={busy === "shopify"}
-        />
-      )}
-
-      {/* Triple Whale — featured card */}
-      <TripleWhaleCard />
-
-      {/* Other integrations — standard cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-        {state.integrations
-          .filter((i) => i.provider !== "shopify" && i.provider !== "triplewhale")
-          .map((i) => {
-            const ok = i.lastSyncStatus === "ok";
-            const err = i.lastSyncStatus === "error";
-            return (
-              <div key={i.provider} className="card p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={cx(
-                        "p-2",
-                        i.connected
-                          ? "bg-carbinox/15 text-carbinox"
-                          : "bg-white/5 text-white/60",
-                      )}
-                    >
-                      <Plug size={18} />
-                    </div>
-                    <div>
-                      <div className="font-display text-lg font-semibold text-white">
-                        {i.label}
-                      </div>
-                      <div className="text-xs text-white/50">
-                        {i.connected ? "Active" : "Not connected"}
-                        {i.lastSyncAt && (
-                          <>
-                            {" · Last sync "}
-                            {new Date(i.lastSyncAt).toLocaleString()}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <Toggle
-                    checked={i.connected}
-                    onChange={(v) => updateIntegration(i.provider, { connected: v })}
-                  />
-                </div>
-
-                <div className="mt-4">
-                  <div className="bracket">Required env vars</div>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {i.envVarsExpected.map((v) => (
-                      <span key={v} className="kbd">{v}</span>
-                    ))}
-                  </div>
-                </div>
-
-                {i.lastSyncMessage && (
-                  <SyncMessage ok={ok} err={err} message={i.lastSyncMessage} />
-                )}
-
-                <div className="mt-4 flex items-center gap-2">
-                  <button
-                    className="btn-ghost"
-                    onClick={() => testSync(i.provider)}
-                    disabled={busy === i.provider}
-                  >
-                    <RefreshCw
-                      size={13}
-                      className={busy === i.provider ? "animate-spin" : ""}
-                    />
-                    {busy === i.provider ? "Testing…" : "Test sync"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-      </div>
-    </div>
-  );
-}
-
-function ShopifyCard({
-  integration,
-  updateIntegration,
-  testSync,
-  busy,
-}: {
-  integration: NonNullable<ReturnType<typeof useStore>["state"]["integrations"][0]>;
-  updateIntegration: (provider: string, patch: any) => void;
-  testSync: () => void;
-  busy: boolean;
-}) {
-  const creds = integration.credentials || {};
-  const [shop, setShop] = useState(creds.SHOPIFY_SHOP || "");
-  const [token, setToken] = useState(creds.SHOPIFY_ADMIN_TOKEN || "");
-  const [showToken, setShowToken] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [verifyResult, setVerifyResult] = useState<
-    | null
-    | { ok: true; shop: { name: string; myshopifyDomain: string; primaryDomain?: string; currency: string; plan?: string } }
-    | { ok: false; error: string }
-  >(null);
-
-  const ok = integration.lastSyncStatus === "ok";
-  const err = integration.lastSyncStatus === "error";
-  const hasCredentials = !!(shop && token);
-  const dirty =
-    shop !== (creds.SHOPIFY_SHOP || "") ||
-    token !== (creds.SHOPIFY_ADMIN_TOKEN || "");
-
-  async function verify() {
-    setVerifying(true);
-    setVerifyResult(null);
-    try {
-      const res = await fetch("/api/shopify/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ shop: shop.trim(), token: token.trim() }),
-      });
-      const data = await res.json();
-      setVerifyResult(data);
-    } catch (e: any) {
-      setVerifyResult({ ok: false, error: e?.message || "Network error" });
-    } finally {
-      setVerifying(false);
-    }
-  }
-
-  function saveCredentials() {
-    updateIntegration("shopify", {
-      connected: true,
-      credentials: {
-        SHOPIFY_SHOP: shop.trim(),
-        SHOPIFY_ADMIN_TOKEN: token.trim(),
-      },
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-  }
-
-  return (
-    <div className="card mt-6 p-6">
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-[2px] bg-[#96bf48]"
-      />
-      <div className="flex items-start gap-4">
-        <div className="bg-[#96bf48]/15 p-3 text-[#96bf48]">
-          <ShoppingBag size={22} />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h2 className="font-display text-2xl font-extrabold uppercase tracking-brand text-white">
-              Shopify
-            </h2>
-            {integration.connected && hasCredentials && (
-              <span className="chip border-ok/60 bg-ok/10 text-ok">
-                <CheckCircle2 size={10} /> Connected
-              </span>
-            )}
-            {saved && (
-              <span className="chip border-ok/60 bg-ok/10 text-ok">
-                <Save size={10} /> Saved
-              </span>
-            )}
+      <div className="mt-6 card flex flex-wrap items-center justify-between gap-3 p-4">
+        <div className="flex items-center gap-3">
+          <ShieldCheck size={18} className="text-carbinox" />
+          <div>
+            <div className="font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
+              {connectedCount} / {PROVIDERS.length} integrations connected via Vercel
+            </div>
+            <div className="text-[11px] text-white/50">
+              Status refreshes when you click Refresh below, or after a redeploy.
+            </div>
           </div>
-          <p className="mt-1 text-sm text-white/55">
-            Pulls order revenue, AOV, order count, fulfillment SLA, and
-            checkout data from the Shopify Admin API (GraphQL).
-          </p>
         </div>
+        <button onClick={load} disabled={loading} className="btn-ghost">
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          Refresh status
+        </button>
       </div>
-
-      {/* OAuth install flow (Partners / dev dashboard apps) */}
-      <OAuthInstallBlock />
 
       {/* Setup instructions */}
-      <div className="mt-6 card bg-white/[0.02] p-4">
-        <div className="bracket">Option B — Direct token (Custom apps)</div>
-        <ol className="mt-2 space-y-1.5 text-[13px] text-white/65 list-decimal list-inside">
+      <div className="card crosshair mt-6 p-5">
+        <div className="bracket text-carbinox">How to connect</div>
+        <ol className="mt-3 space-y-2 text-[13px] text-white/70 list-decimal list-inside">
           <li>
-            Go to <b className="text-white">Shopify Admin → Settings → Apps → Develop apps</b>
+            Get the API key/token from the provider (instructions inside each
+            card below).
           </li>
           <li>
-            Click <b className="text-white">Create an app</b> → name it "Carbinox KPI Tracker"
+            Go to{" "}
+            <a
+              href="https://vercel.com/dashboard"
+              target="_blank"
+              rel="noreferrer"
+              className="text-carbinox hover:underline"
+            >
+              vercel.com/dashboard
+            </a>{" "}
+            → your <b className="text-white">kpitracker</b> project →{" "}
+            <b className="text-white">Settings → Environment Variables</b>.
           </li>
           <li>
-            Under <b className="text-white">Configure Admin API scopes</b>, enable:
-            <div className="mt-1 flex flex-wrap gap-1">
-              {SHOPIFY_SCOPES.map((s) => (
-                <span key={s} className="kbd">{s}</span>
-              ))}
-            </div>
+            Add the env vars shown in each card. Environment:{" "}
+            <span className="kbd">Production</span> (or all).
           </li>
           <li>
-            Click <b className="text-white">Install app</b> → copy the{" "}
-            <b className="text-white">Admin API access token</b>
+            Go to <b className="text-white">Deployments</b> → latest → ⋯ menu →{" "}
+            <b className="text-white">Redeploy</b> (so the new vars take effect).
           </li>
-          <li>Paste your shop domain and token below, then press <b className="text-white">Save</b></li>
+          <li>Come back here and click "Refresh status" — connected providers light up.</li>
         </ol>
       </div>
 
-      {/* Credential form */}
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label className="label">Shop domain</label>
-          <input
-            value={shop}
-            onChange={(e) => setShop(e.target.value)}
-            placeholder="carbinox.myshopify.com"
-            className="input"
-          />
-          <div className="mt-1 text-[10px] text-white/40">
-            Your *.myshopify.com domain (not your custom domain)
-          </div>
-        </div>
-        <div>
-          <label className="label">Admin API access token</label>
-          <div className="relative">
-            <input
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              type={showToken ? "text" : "password"}
-              className="input pr-10"
-            />
-            <button
-              onClick={() => setShowToken(!showToken)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
-              type="button"
-            >
-              {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-          </div>
-          <div className="mt-1 text-[10px] text-white/40">
-            Starts with shpat_ — stored in your browser only
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button
-          onClick={verify}
-          disabled={!hasCredentials || verifying}
-          className="btn-ghost disabled:opacity-40"
-        >
-          <ShieldCheck size={13} className={verifying ? "animate-pulse" : ""} />
-          {verifying ? "Verifying…" : "Verify credentials"}
-        </button>
-        <button
-          onClick={saveCredentials}
-          disabled={!hasCredentials || (!dirty && !saved)}
-          className="btn-primary disabled:opacity-40"
-        >
-          <Save size={13} />
-          {dirty ? "Save credentials" : "Saved"}
-        </button>
-        <button
-          onClick={testSync}
-          disabled={busy || !hasCredentials}
-          className="btn-ghost disabled:opacity-40"
-        >
-          <RefreshCw size={13} className={busy ? "animate-spin" : ""} />
-          {busy ? "Syncing…" : "Test sync"}
-        </button>
-        {!hasCredentials && (
-          <span className="text-[12px] text-white/40">
-            Enter both fields above to enable sync
-          </span>
-        )}
-      </div>
-
-      {verifyResult && (
-        <div className="mt-4">
-          {verifyResult.ok ? (
-            <div className="border border-ok/30 bg-ok/10 p-3 text-[12px] text-ok">
-              <div className="flex items-center gap-2 font-heading font-semibold uppercase tracking-brand">
-                <CheckCircle2 size={14} /> Connected to {verifyResult.shop.name}
-              </div>
-              <div className="mt-1.5 grid grid-cols-2 gap-1 text-white/70">
-                <div>
-                  <span className="text-white/40">Domain:</span>{" "}
-                  {verifyResult.shop.myshopifyDomain}
-                </div>
-                {verifyResult.shop.primaryDomain && (
-                  <div>
-                    <span className="text-white/40">Primary:</span>{" "}
-                    {verifyResult.shop.primaryDomain}
-                  </div>
-                )}
-                <div>
-                  <span className="text-white/40">Currency:</span>{" "}
-                  {verifyResult.shop.currency}
-                </div>
-                {verifyResult.shop.plan && (
-                  <div>
-                    <span className="text-white/40">Plan:</span>{" "}
-                    {verifyResult.shop.plan}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="border border-bad/30 bg-bad/10 p-3 text-[12px] text-bad">
-              <div className="flex items-center gap-2 font-heading font-semibold uppercase tracking-brand">
-                <CircleAlert size={14} /> Verification failed
-              </div>
-              <div className="mt-1.5 text-white/80">{verifyResult.error}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {integration.lastSyncMessage && (
-        <div className="mt-4">
-          <SyncMessage ok={ok} err={err} message={integration.lastSyncMessage} />
-        </div>
-      )}
-
-      {/* Diagnostic panel */}
-      <DiagnosticPanel integration={integration} />
-
-      {/* What data Shopify provides */}
-      <div className="mt-6 border-t border-white/5 pt-4">
-        <div className="bracket">Available metrics</div>
-        <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
-          {[
-            { name: "Total Revenue", key: "orders.total_sales", status: "live" },
-            { name: "AOV", key: "orders.aov", status: "live" },
-            { name: "Order Count", key: "orders.count", status: "live" },
-            { name: "Fulfillment SLA", key: "fulfillment.sla", status: "live" },
-            { name: "Checkout Completion", key: "checkout.completion", status: "live" },
-            { name: "Conversion Rate", key: "site.conversion_rate", status: "soon" },
-          ].map((m) => (
-            <div
-              key={m.key}
-              className="flex items-center gap-2 border border-white/10 bg-white/[0.02] p-2 text-[11px]"
-            >
-              <span
-                className={cx(
-                  "h-1.5 w-1.5 rounded-full",
-                  m.status === "live" ? "bg-ok" : "bg-warn",
-                )}
+      {/* Provider cards */}
+      <div className="mt-6 space-y-4">
+        {PROVIDERS.map((p) => {
+          const s = status?.[p.id];
+          const connected = s?.envReady;
+          return (
+            <div key={p.id} className="card relative p-5">
+              <div
+                aria-hidden
+                className="absolute inset-x-0 top-0 h-[2px]"
+                style={{ background: p.color }}
               />
-              <span className="text-white">{m.name}</span>
-              {m.status === "soon" && (
-                <span className="chip border-warn/30 bg-warn/10 text-warn px-1 py-0 text-[8px]">
-                  Soon
-                </span>
-              )}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h2 className="font-display text-2xl font-extrabold uppercase tracking-brand text-white">
+                      {p.label}
+                    </h2>
+                    {connected ? (
+                      <span className="chip border-ok/60 bg-ok/10 text-ok">
+                        <CheckCircle2 size={10} /> Connected
+                      </span>
+                    ) : (
+                      <span className="chip border-white/20 bg-white/[0.03] text-white/60">
+                        Not connected
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[12px] text-white/55">{p.purpose}</p>
+                </div>
+                <a
+                  href={p.getKeyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-ghost"
+                >
+                  <ExternalLink size={13} /> Get key
+                </a>
+              </div>
+
+              {/* Instructions */}
+              <div className="mt-4 card bg-white/[0.02] p-3">
+                <div className="bracket">How to get the key(s)</div>
+                <ol className="mt-2 space-y-1 text-[12px] text-white/60 list-decimal list-inside">
+                  {p.instructions.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ol>
+              </div>
+
+              {/* Env vars to set */}
+              <div className="mt-4">
+                <div className="bracket">Env vars to add in Vercel</div>
+                <div className="mt-2 space-y-1.5">
+                  {p.vars.map((v) => {
+                    const isSet = s?.envVarsSet.includes(v.name);
+                    return (
+                      <div
+                        key={v.name}
+                        className="flex flex-wrap items-center gap-2 border border-white/10 bg-jet-900 p-2"
+                      >
+                        <span
+                          className={cx(
+                            "h-1.5 w-1.5 rounded-full",
+                            isSet ? "bg-ok" : "bg-white/25",
+                          )}
+                        />
+                        <code className="flex-1 font-numeric text-[12px] text-white">
+                          {v.name}
+                        </code>
+                        <code className="hidden font-numeric text-[10px] text-white/35 md:inline">
+                          {v.placeholder}
+                        </code>
+                        <button
+                          onClick={() => copy(v.name)}
+                          className="text-white/40 hover:text-white"
+                          title="Copy env var name"
+                        >
+                          <Copy size={11} />
+                        </button>
+                        {isSet ? (
+                          <span className="chip border-ok/40 bg-ok/10 text-ok px-1 py-0 text-[9px]">
+                            Set
+                          </span>
+                        ) : (
+                          <span className="chip border-white/15 text-white/50 px-1 py-0 text-[9px]">
+                            Missing
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {copiedVar && (
+                  <div className="mt-1.5 text-[10px] text-ok">
+                    Copied "{copiedVar}" to clipboard
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
+          );
+        })}
+      </div>
+
+      {/* Bottom hint */}
+      <div className="mt-6 flex items-start gap-2 border border-white/10 bg-white/[0.02] p-3 text-[12px] text-white/60">
+        <CircleAlert size={14} className="shrink-0 text-white/40 mt-0.5" />
+        <div>
+          After adding or changing env vars in Vercel, you must <b className="text-white">redeploy</b>{" "}
+          for the new values to take effect. Vercel → Deployments → latest → ⋯ →
+          Redeploy.
         </div>
       </div>
     </div>
-  );
-}
-
-function SyncMessage({
-  ok,
-  err,
-  message,
-}: {
-  ok: boolean;
-  err: boolean;
-  message: string;
-}) {
-  return (
-    <div
-      className={cx(
-        "flex items-start gap-2 border p-2.5 text-xs",
-        ok && "border-ok/20 bg-ok/10 text-ok",
-        err && "border-bad/20 bg-bad/10 text-bad",
-        !ok && !err && "border-white/10 bg-white/[0.02] text-white/60",
-      )}
-    >
-      {ok ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}
-      {message}
-    </div>
-  );
-}
-
-function TripleWhaleCard() {
-  const { state, updateIntegration } = useStore();
-  const tw = state.integrations.find((i) => i.provider === "triplewhale");
-  const creds = tw?.credentials || {};
-  const [apiKey, setApiKey] = useState(creds.TRIPLEWHALE_API_KEY || "");
-  const [shopId, setShopId] = useState(
-    creds.TRIPLEWHALE_SHOP_ID ||
-    creds.SHOPIFY_SHOP ||
-    state.integrations.find((i) => i.provider === "shopify")?.credentials?.SHOPIFY_SHOP ||
-    "",
-  );
-  const [showKey, setShowKey] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
-
-  function save() {
-    updateIntegration("triplewhale", {
-      connected: true,
-      credentials: {
-        TRIPLEWHALE_API_KEY: apiKey.trim(),
-        TRIPLEWHALE_SHOP_ID: shopId.trim(),
-      },
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-  }
-
-  async function test() {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const res = await fetch("/api/triplewhale/summary", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          credentials: {
-            TRIPLEWHALE_API_KEY: apiKey.trim(),
-            TRIPLEWHALE_SHOP_ID: shopId.trim(),
-          },
-        }),
-      });
-      const data = await res.json();
-      setTestResult(
-        data.source === "live"
-          ? "Connected — live data received."
-          : data.note || "Simulated — check credentials.",
-      );
-    } catch (e: any) {
-      setTestResult(`Error: ${e?.message || "Network error"}`);
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  const ready = !!(apiKey && shopId);
-
-  return (
-    <div className="card mt-6 p-6">
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-[2px] bg-[#4f46e5]"
-      />
-      <div className="flex items-start gap-4">
-        <div className="bg-[#4f46e5]/15 p-3 text-[#4f46e5]">
-          <Zap size={22} />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h2 className="font-display text-2xl font-extrabold uppercase tracking-brand text-white">
-              Triple Whale
-            </h2>
-            {tw?.connected && ready && (
-              <span className="chip border-ok/60 bg-ok/10 text-ok">
-                <CheckCircle2 size={10} /> Connected
-              </span>
-            )}
-            {saved && (
-              <span className="chip border-ok/60 bg-ok/10 text-ok">
-                <Save size={10} /> Saved
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-white/55">
-            ROAS, CPA, CTR, spend, and revenue across Meta, Google, TikTok,
-            Snap, and AppLovin.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 card bg-white/[0.02] p-4">
-        <div className="bracket">How to get your API key</div>
-        <ol className="mt-2 space-y-1.5 text-[13px] text-white/65 list-decimal list-inside">
-          <li>Go to <b className="text-white">Triple Whale → Settings → API</b></li>
-          <li>Click <b className="text-white">Generate API Key</b> (or copy existing)</li>
-          <li>Paste it below</li>
-        </ol>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label className="label">Shop domain</label>
-          <input
-            value={shopId}
-            onChange={(e) => setShopId(e.target.value)}
-            placeholder="carbinox.myshopify.com"
-            className="input"
-          />
-        </div>
-        <div>
-          <label className="label">API Key</label>
-          <div className="relative">
-            <input
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              type={showKey ? "text" : "password"}
-              placeholder="tw_api_xxxxxxxxxxxxxxxx"
-              className="input pr-10"
-            />
-            <button
-              onClick={() => setShowKey(!showKey)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
-              type="button"
-            >
-              {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button onClick={save} disabled={!ready} className="btn-primary disabled:opacity-40">
-          <Save size={13} /> Save credentials
-        </button>
-        <button
-          onClick={test}
-          disabled={!ready || testing}
-          className="btn-ghost disabled:opacity-40"
-        >
-          <RefreshCw size={13} className={testing ? "animate-spin" : ""} />
-          {testing ? "Testing…" : "Test sync"}
-        </button>
-      </div>
-
-      {testResult && (
-        <div
-          className={cx(
-            "mt-3 flex items-center gap-2 border p-2.5 text-[12px]",
-            testResult.startsWith("Connected")
-              ? "border-ok/30 bg-ok/10 text-ok"
-              : "border-bad/30 bg-bad/10 text-bad",
-          )}
-        >
-          {testResult.startsWith("Connected") ? (
-            <CheckCircle2 size={14} />
-          ) : (
-            <CircleAlert size={14} />
-          )}
-          {testResult}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OAuthInstallBlock() {
-  const [shop, setShop] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const [showSecret, setShowSecret] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [redirectUri, setRedirectUri] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/shopify/redirect-url")
-      .then((r) => r.json())
-      .then((d) => setRedirectUri(d.redirectUri))
-      .catch(() => {});
-  }, []);
-
-  function copyRedirect() {
-    if (!redirectUri) return;
-    navigator.clipboard.writeText(redirectUri).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
-
-  async function startInstall() {
-    setError(null);
-    setBusy(true);
-    try {
-      const res = await fetch("/api/shopify/auth", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          shop: shop.trim(),
-          clientId: clientId.trim(),
-          clientSecret: clientSecret.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!data.ok || !data.installUrl) {
-        setError(data.error || "Failed to build install URL.");
-        setBusy(false);
-        return;
-      }
-      // Send the user to Shopify to approve the install
-      window.location.href = data.installUrl;
-    } catch (e: any) {
-      setError(e?.message || "Network error");
-      setBusy(false);
-    }
-  }
-
-  const ready = !!(shop && clientId && clientSecret);
-
-  return (
-    <div className="mt-6 card bg-white/[0.02] p-4">
-      <div className="bracket">Option A — OAuth install (Partners / dev dashboard apps)</div>
-      <p className="mt-2 text-[12px] text-white/55">
-        Paste your app's <b className="text-white">Client ID</b> and{" "}
-        <b className="text-white">Client Secret</b> from the Shopify dev
-        dashboard, plus your shop domain. Clicking <b className="text-white">Install on Shopify</b>{" "}
-        redirects you to Shopify to approve the install, then sends you back
-        here with the access token applied automatically.
-      </p>
-
-      {/* Redirect URL to whitelist — critical */}
-      {redirectUri && (
-        <div className="mt-3 border border-carbinox/40 bg-carbinox/5 p-3">
-          <div className="bracket text-carbinox">Whitelist this exact URL in your Shopify app</div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all bg-jet-900 border border-white/10 px-2 py-1.5 text-[11px] font-numeric text-white">
-              {redirectUri}
-            </code>
-            <button onClick={copyRedirect} className="btn-ghost py-1">
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
-          <div className="mt-1.5 text-[10px] text-white/50">
-            In the Shopify dev dashboard → your app → Configuration → Redirect URLs,
-            add this exact string (must match character-for-character, including protocol and no trailing slash).
-          </div>
-        </div>
-      )}
-
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div>
-          <label className="label">Shop domain</label>
-          <input
-            value={shop}
-            onChange={(e) => setShop(e.target.value)}
-            placeholder="carbinox.myshopify.com"
-            className="input"
-          />
-        </div>
-        <div>
-          <label className="label">Client ID</label>
-          <input
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            placeholder="from Shopify dev dashboard"
-            className="input"
-          />
-        </div>
-        <div>
-          <label className="label">Client Secret</label>
-          <div className="relative">
-            <input
-              value={clientSecret}
-              onChange={(e) => setClientSecret(e.target.value)}
-              type={showSecret ? "text" : "password"}
-              placeholder="•••••••••••"
-              className="input pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowSecret(!showSecret)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
-            >
-              {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          onClick={startInstall}
-          disabled={!ready || busy}
-          className="btn-primary disabled:opacity-40"
-        >
-          <ExternalLink size={13} />
-          {busy ? "Redirecting…" : "Install on Shopify"}
-        </button>
-        <span className="text-[11px] text-white/40">
-          Your app must have <span className="kbd">embedded: false</span> and this
-          redirect URL: <span className="kbd">/api/shopify/callback</span>
-        </span>
-      </div>
-
-      {error && (
-        <div className="mt-3 border border-bad/30 bg-bad/10 p-2.5 text-[12px] text-bad">
-          <div className="flex items-start gap-2">
-            <CircleAlert size={14} /> {error}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DiagnosticPanel({
-  integration,
-}: {
-  integration: NonNullable<ReturnType<typeof useStore>["state"]["integrations"][0]>;
-}) {
-  const creds = integration.credentials || {};
-  const shop = creds.SHOPIFY_SHOP || "(none)";
-  const token = creds.SHOPIFY_ADMIN_TOKEN || "";
-  const tokenPrefix = token ? token.slice(0, 10) + "…" + token.slice(-4) : "(none)";
-  const tokenLength = token.length;
-
-  const [verifying, setVerifying] = useState(false);
-  const [result, setResult] = useState<any>(null);
-
-  async function verify() {
-    setVerifying(true);
-    setResult(null);
-    try {
-      const res = await fetch("/api/shopify/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ shop, token }),
-      });
-      const data = await res.json();
-      setResult({ httpStatus: res.status, ...data });
-    } catch (e: any) {
-      setResult({ httpStatus: 0, error: e?.message || "Network error" });
-    } finally {
-      setVerifying(false);
-    }
-  }
-
-  return (
-    <div className="mt-4 card bg-white/[0.02] p-4">
-      <div className="bracket">Diagnostics</div>
-      <div className="mt-2 grid grid-cols-1 gap-2 text-[11px] md:grid-cols-3">
-        <div>
-          <div className="text-white/40">Saved shop</div>
-          <code className="block break-all text-white">{shop}</code>
-        </div>
-        <div>
-          <div className="text-white/40">Token (masked)</div>
-          <code className="block break-all text-white">{tokenPrefix}</code>
-        </div>
-        <div>
-          <div className="text-white/40">Token length</div>
-          <code className="block text-white">{tokenLength} chars</code>
-        </div>
-      </div>
-      <div className="mt-3 flex items-center gap-2">
-        <button onClick={verify} disabled={verifying || !token} className="btn-ghost py-1">
-          {verifying ? "Verifying…" : "Verify saved credentials"}
-        </button>
-        <span className="text-[10px] text-white/40">
-          Hits Shopify's shop endpoint with the stored token to prove it works
-        </span>
-      </div>
-      {result && (
-        <div
-          className={cx(
-            "mt-3 border p-3 text-[11px]",
-            result.ok
-              ? "border-ok/30 bg-ok/10 text-ok"
-              : "border-bad/30 bg-bad/10 text-bad",
-          )}
-        >
-          <div className="flex items-center gap-2">
-            {result.ok ? <CheckCircle2 size={13} /> : <CircleAlert size={13} />}
-            <span className="font-heading font-semibold uppercase tracking-brand">
-              HTTP {result.httpStatus} — {result.ok ? "Verified" : "Failed"}
-            </span>
-          </div>
-          {result.shop && (
-            <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-white/80">
-              {JSON.stringify(result.shop, null, 2)}
-            </pre>
-          )}
-          {result.error && (
-            <div className="mt-2 text-white/85">{result.error}</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="inline-flex cursor-pointer items-center">
-      <input
-        type="checkbox"
-        className="peer sr-only"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span className="h-5 w-9 rounded-full bg-white/10 transition peer-checked:bg-carbinox" />
-      <span className="-ml-8 h-4 w-4 translate-x-0.5 rounded-full bg-white transition peer-checked:translate-x-4" />
-    </label>
   );
 }

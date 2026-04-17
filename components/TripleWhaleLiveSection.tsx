@@ -41,8 +41,7 @@ export function TripleWhaleLiveSection({ timeframe: _ }: { timeframe: Timeframe 
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("last_7d");
 
-  const hasCreds =
-    !!tw?.credentials?.TRIPLEWHALE_API_KEY;
+  const hasCreds = !!tw?.credentials?.TRIPLEWHALE_API_KEY;
 
   async function load() {
     setLoading(true);
@@ -66,7 +65,9 @@ export function TripleWhaleLiveSection({ timeframe: _ }: { timeframe: Timeframe 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!hasCreds && !summary) {
+  const notConnected = summary && summary.source !== "live" && !hasCreds;
+
+  if (notConnected) {
     return (
       <section className="mt-10">
         <div className="bracket">Triple Whale — Not Connected</div>

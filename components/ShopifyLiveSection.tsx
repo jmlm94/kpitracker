@@ -60,8 +60,6 @@ export function ShopifyLiveSection({ timeframe: _ }: { timeframe: Timeframe }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // With env vars on Vercel the integration entry may not have credentials in
-  // browser state. Consider it "connected" if the API returns live data.
   const hasClientCreds =
     !!shopify?.credentials?.SHOPIFY_SHOP &&
     !!shopify?.credentials?.SHOPIFY_ADMIN_TOKEN;
@@ -91,9 +89,11 @@ export function ShopifyLiveSection({ timeframe: _ }: { timeframe: Timeframe }) {
   }, []);
 
   const isLive = summary?.source === "live";
-  const notConnected = !isLive && !hasClientCreds;
+  // Show the "Connect" prompt only if we've loaded AND got simulated data AND
+  // have no client creds (= no env vars + no localStorage creds)
+  const notConnected = summary && !isLive && !hasClientCreds;
 
-  if (notConnected && !summary) {
+  if (notConnected) {
     return (
       <section className="mt-10">
         <div className="bracket">Shopify — Not Connected</div>
