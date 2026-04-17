@@ -59,6 +59,8 @@ type OrderNode = {
   createdAt: string;
   totalPriceSet: { shopMoney: { amount: string } };
   displayFulfillmentStatus: string;
+  displayFinancialStatus: string;
+  refunds: { id: string }[];
   fulfillments: { createdAt: string }[];
 };
 
@@ -81,6 +83,8 @@ async function fetchOrders(
             createdAt
             totalPriceSet { shopMoney { amount } }
             displayFulfillmentStatus
+            displayFinancialStatus
+            refunds { id }
             fulfillments(first: 1) { createdAt }
           }
         }
@@ -96,6 +100,55 @@ async function fetchOrders(
     if (!data.orders.pageInfo.hasNextPage) break;
   }
   return orders;
+}
+
+/**
+ * Attempts to fetch session/conversion data via Shopify's ShopifyQL analytics
+ * endpoint. Requires read_analytics scope + a Shopify plan that supports it.
+ * Returns a map of date -> {sessions, orders} or null if not available.
+ */
+async function fetchSessions(
+  creds: ShopifyCreds,
+  sinceDays: number,
+): Promise<Map<string, { sessions: number; orders: number }> | null> {
+  try {
+    const query = `mutation {
+      shopifyqlQuery(query: "FROM visitors SHOW sum(sessions), sum(orders) SINCE -${sinceDays}d UNTIL today TIMESERIES day") {
+        ... on TableResponse {
+          tableData {
+            rowData
+            columns { name dataType }
+          }
+        }
+        ... on ParseError {
+          code
+          message
+        }
+      }
+    }`;
+    const data = await gql(creds, query);
+    const td = data?.shopifyqlQuery?.tableData;
+    if (!td?.rowData || !td?.columns) return null;
+
+    // Find indexes of day / sessions / orders in the returned columns
+    const cols: string[] = td.columns.map((c: any) => c.name);
+    const dayIdx = cols.findIndex((n) => /day|date/i.test(n));
+    const sessionsIdx = cols.findIndex((n) => /session/i.test(n));
+    const ordersIdx = cols.findIndex((n) => /order/i.test(n));
+
+    if (dayIdx === -1 || sessionsIdx === -1) return null;
+
+    const out = new Map<string, { sessions: number; orders: number }>();
+    for (const row of td.rowData as string[][]) {
+      const day = String(row[dayIdx]).slice(0, 10);
+      const sessions = Number(row[sessionsIdx]) || 0;
+      const orders = ordersIdx >= 0 ? Number(row[ordersIdx]) || 0 : 0;
+      out.set(day, { sessions, orders });
+    }
+    return out;
+  } catch {
+    return null; // silently fall back to null; UI will show N/A
+  }
 }
 
 function bucketByDay(
@@ -290,17 +343,31 @@ export type ShopifySummary = {
     date: string;
     revenue: number;
     orders: number;
+    returns: number;
+    sessions: number;
     fulfillmentsWithinSLA: number;
     paidOrders: number;
   }[];
-  totals: {
-    revenue: number;
-    orders: number;
-    aov: number;
-    fulfillmentSLAPct: number;
-    paidRatioPct: number;
-  };
+  /** Per-window aggregates. Keys are timeframe identifiers. */
+  windows: Record<
+    string,
+    {
+      revenue: number;
+      orders: number;
+      returns: number;
+      aov: number;
+      conversionRate: number | null;
+    }
+  >;
 };
+
+export const SHOPIFY_WINDOWS = [
+  { key: "today", label: "Today", days: 1, offset: 0 },
+  { key: "yesterday", label: "Yesterday", days: 1, offset: 1 },
+  { key: "last_7d", label: "Last 7 Days", days: 7, offset: 0 },
+  { key: "last_14d", label: "Last 14 Days", days: 14, offset: 0 },
+  { key: "last_30d", label: "Last 30 Days", days: 30, offset: 0 },
+] as const;
 
 /**
  * Pull a single 1-pass summary for the dashboard. Fetches every order in
@@ -316,13 +383,6 @@ export async function fetchShopifySummary(
   endISO: string,
 ): Promise<ShopifySummary> {
   const creds = getCreds(credentials);
-  const days = Math.max(
-    1,
-    Math.round(
-      (new Date(endISO).getTime() - new Date(startISO).getTime()) / 86400000,
-    ) + 1,
-  );
-
   const dates: string[] = [];
   const cur = new Date(startISO);
   cur.setHours(0, 0, 0, 0);
@@ -338,8 +398,12 @@ export async function fetchShopifySummary(
   }
 
   try {
-    const orders = await fetchOrders(creds, startISO, endISO);
-    return buildSummary(orders, dates, startISO, endISO);
+    // Fetch orders + (best-effort) sessions in parallel
+    const [orders, sessions] = await Promise.all([
+      fetchOrders(creds, startISO, endISO),
+      fetchSessions(creds, Math.max(1, dates.length)),
+    ]);
+    return buildSummary(orders, sessions, dates, startISO, endISO);
   } catch (err: any) {
     return simulateSummary(
       startISO,
@@ -350,19 +414,54 @@ export async function fetchShopifySummary(
   }
 }
 
+function computeWindows(
+  samples: ShopifySummary["samples"],
+): ShopifySummary["windows"] {
+  const out: ShopifySummary["windows"] = {};
+  // last N days ending today (inclusive) = last N samples
+  // "today" = last sample, "yesterday" = second-last sample
+  const lastIdx = samples.length - 1;
+  function sliceForWindow(w: { days: number; offset: number }) {
+    const endI = lastIdx - w.offset;
+    const startI = Math.max(0, endI - w.days + 1);
+    if (endI < 0 || startI > endI) return [];
+    return samples.slice(startI, endI + 1);
+  }
+  for (const w of SHOPIFY_WINDOWS) {
+    const slice = sliceForWindow(w);
+    const revenue = slice.reduce((a, s) => a + s.revenue, 0);
+    const orders = slice.reduce((a, s) => a + s.orders, 0);
+    const returns = slice.reduce((a, s) => a + s.returns, 0);
+    const sessions = slice.reduce((a, s) => a + s.sessions, 0);
+    const aov = orders > 0 ? revenue / orders : 0;
+    const cvr = sessions > 0 ? (orders / sessions) * 100 : null;
+    out[w.key] = {
+      revenue: round2(revenue),
+      orders,
+      returns,
+      aov: round2(aov),
+      conversionRate: cvr === null ? null : Number(cvr.toFixed(2)),
+    };
+  }
+  return out;
+}
+
 function buildSummary(
   orders: OrderNode[],
+  sessions: Map<string, { sessions: number; orders: number }> | null,
   dates: string[],
   startISO: string,
   endISO: string,
 ): ShopifySummary {
   const dailyRevenue = new Map<string, number>();
   const dailyOrders = new Map<string, number>();
+  const dailyReturns = new Map<string, number>();
   const dailyInSLA = new Map<string, number>();
   const dailyPaid = new Map<string, number>();
   for (const d of dates) {
     dailyRevenue.set(d, 0);
     dailyOrders.set(d, 0);
+    dailyReturns.set(d, 0);
     dailyInSLA.set(d, 0);
     dailyPaid.set(d, 0);
   }
@@ -373,6 +472,15 @@ function buildSummary(
     dailyRevenue.set(day, (dailyRevenue.get(day) || 0) + amount);
     dailyOrders.set(day, (dailyOrders.get(day) || 0) + 1);
     if (amount > 0) dailyPaid.set(day, (dailyPaid.get(day) || 0) + 1);
+    // Refunded orders = "Returns"
+    const fin = (o.displayFinancialStatus || "").toUpperCase();
+    if (
+      o.refunds?.length > 0 ||
+      fin === "REFUNDED" ||
+      fin === "PARTIALLY_REFUNDED"
+    ) {
+      dailyReturns.set(day, (dailyReturns.get(day) || 0) + 1);
+    }
     if (o.fulfillments.length > 0) {
       const diffH =
         (new Date(o.fulfillments[0].createdAt).getTime() -
@@ -382,36 +490,21 @@ function buildSummary(
     }
   }
 
-  const samples = dates.map((d) => ({
+  const samples: ShopifySummary["samples"] = dates.map((d) => ({
     date: d,
     revenue: round2(dailyRevenue.get(d) || 0),
     orders: dailyOrders.get(d) || 0,
+    returns: dailyReturns.get(d) || 0,
+    sessions: sessions?.get(d)?.sessions ?? 0,
     fulfillmentsWithinSLA: dailyInSLA.get(d) || 0,
     paidOrders: dailyPaid.get(d) || 0,
   }));
-
-  const totalRev = samples.reduce((a, s) => a + s.revenue, 0);
-  const totalOrders = samples.reduce((a, s) => a + s.orders, 0);
-  const totalInSLA = samples.reduce((a, s) => a + s.fulfillmentsWithinSLA, 0);
-  const totalPaid = samples.reduce((a, s) => a + s.paidOrders, 0);
-  const fulfillable = samples.reduce(
-    (a, s) => a + Math.min(s.orders, s.fulfillmentsWithinSLA === 0 ? s.orders : s.orders),
-    0,
-  );
 
   return {
     source: "live",
     dateRange: { start: startISO, end: endISO, days: dates.length },
     samples,
-    totals: {
-      revenue: round2(totalRev),
-      orders: totalOrders,
-      aov: totalOrders > 0 ? round2(totalRev / totalOrders) : 0,
-      fulfillmentSLAPct:
-        fulfillable > 0 ? Number(((totalInSLA / Math.max(1, totalOrders)) * 100).toFixed(1)) : 0,
-      paidRatioPct:
-        totalOrders > 0 ? Number(((totalPaid / totalOrders) * 100).toFixed(1)) : 0,
-    },
+    windows: computeWindows(samples),
   };
 }
 
@@ -421,39 +514,30 @@ function simulateSummary(
   dates: string[],
   note = "Shopify credentials not configured — showing simulated data.",
 ): ShopifySummary {
-  const avgDailyRev = 45000; // placeholder daily avg
+  const avgDailyRev = 45000;
   const avgOrders = 300;
-  const samples = dates.map((d, i) => {
+  const samples: ShopifySummary["samples"] = dates.map((d, i) => {
     const drift = Math.sin(i * 0.6) * 0.15;
     const jitter = (Math.random() - 0.5) * 0.2;
     const rev = Math.max(0, Math.round(avgDailyRev * (1 + drift + jitter)));
     const ords = Math.max(0, Math.round(avgOrders * (1 + drift + jitter)));
+    const sess = Math.round(ords * (15 + Math.random() * 5));
     return {
       date: d,
       revenue: rev,
       orders: ords,
+      returns: Math.round(ords * 0.03),
+      sessions: sess,
       fulfillmentsWithinSLA: Math.round(ords * (0.95 + Math.random() * 0.04)),
       paidOrders: Math.round(ords * (0.97 + Math.random() * 0.02)),
     };
   });
-  const totalRev = samples.reduce((a, s) => a + s.revenue, 0);
-  const totalOrders = samples.reduce((a, s) => a + s.orders, 0);
-  const totalInSLA = samples.reduce((a, s) => a + s.fulfillmentsWithinSLA, 0);
-  const totalPaid = samples.reduce((a, s) => a + s.paidOrders, 0);
   return {
     source: "simulated",
     note,
     dateRange: { start: startISO, end: endISO, days: dates.length },
     samples,
-    totals: {
-      revenue: totalRev,
-      orders: totalOrders,
-      aov: totalOrders > 0 ? round2(totalRev / totalOrders) : 0,
-      fulfillmentSLAPct:
-        totalOrders > 0 ? Number(((totalInSLA / totalOrders) * 100).toFixed(1)) : 0,
-      paidRatioPct:
-        totalOrders > 0 ? Number(((totalPaid / totalOrders) * 100).toFixed(1)) : 0,
-    },
+    windows: computeWindows(samples),
   };
 }
 

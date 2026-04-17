@@ -16,14 +16,13 @@ export async function POST(req: Request) {
     body = await req.json();
   } catch {}
 
+  // Always fetch 30 days so the matrix can slice today/yesterday/7d/14d/30d.
   const end = body.end || new Date().toISOString().slice(0, 10);
-  const start =
-    body.start ||
-    (() => {
-      const d = new Date(end);
-      d.setDate(d.getDate() - 29);
-      return d.toISOString().slice(0, 10);
-    })();
+  const start = (() => {
+    const d = new Date(end);
+    d.setDate(d.getDate() - 29);
+    return d.toISOString().slice(0, 10);
+  })();
 
   const summary = await fetchShopifySummary(body.credentials, start, end);
   return NextResponse.json(summary);

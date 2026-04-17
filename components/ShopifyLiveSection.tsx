@@ -3,17 +3,13 @@
 import { useEffect, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useStore } from "@/lib/store";
-import { formatValue, formatValueFull } from "@/lib/format";
-import { rangeFor, type Timeframe } from "@/lib/timeframe";
+import { formatValue } from "@/lib/format";
+import type { Timeframe } from "@/lib/timeframe";
 import {
   CheckCircle2,
   CircleAlert,
-  DollarSign,
-  Package,
   RefreshCw,
   ShoppingBag,
-  Truck,
-  Receipt,
 } from "lucide-react";
 
 type Summary = {
@@ -24,47 +20,60 @@ type Summary = {
     date: string;
     revenue: number;
     orders: number;
+    returns: number;
+    sessions: number;
     fulfillmentsWithinSLA: number;
     paidOrders: number;
   }[];
-  totals: {
-    revenue: number;
-    orders: number;
-    aov: number;
-    fulfillmentSLAPct: number;
-    paidRatioPct: number;
-  };
+  windows: Record<
+    string,
+    {
+      revenue: number;
+      orders: number;
+      returns: number;
+      aov: number;
+      conversionRate: number | null;
+    }
+  >;
 };
 
-export function ShopifyLiveSection({ timeframe }: { timeframe: Timeframe }) {
+const WINDOW_COLUMNS = [
+  { key: "today", label: "Today" },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "last_7d", label: "7 Days" },
+  { key: "last_14d", label: "14 Days" },
+  { key: "last_30d", label: "30 Days" },
+] as const;
+
+const METRIC_ROWS = [
+  { key: "revenue", label: "Revenue", kind: "currency" as const },
+  { key: "orders", label: "Orders", kind: "number" as const },
+  { key: "aov", label: "AOV", kind: "currency" as const },
+  { key: "returns", label: "Returns", kind: "number" as const },
+  { key: "conversionRate", label: "Conversion Rate", kind: "percent" as const },
+];
+
+export function ShopifyLiveSection({ timeframe: _ }: { timeframe: Timeframe }) {
   const { state } = useStore();
   const shopify = state.integrations.find((i) => i.provider === "shopify");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const connected =
-    shopify?.connected &&
+  // With env vars on Vercel the integration entry may not have credentials in
+  // browser state. Consider it "connected" if the API returns live data.
+  const hasClientCreds =
     !!shopify?.credentials?.SHOPIFY_SHOP &&
     !!shopify?.credentials?.SHOPIFY_ADMIN_TOKEN;
 
   async function load() {
-    if (!connected) {
-      setSummary(null);
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
-      const [start, end] = rangeFor(timeframe);
       const res = await fetch("/api/shopify/summary", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          credentials: shopify?.credentials,
-          start,
-          end,
-        }),
+        body: JSON.stringify({ credentials: shopify?.credentials }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as Summary;
@@ -79,9 +88,12 @@ export function ShopifyLiveSection({ timeframe }: { timeframe: Timeframe }) {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeframe, connected]);
+  }, []);
 
-  if (!connected) {
+  const isLive = summary?.source === "live";
+  const notConnected = !isLive && !hasClientCreds;
+
+  if (notConnected && !summary) {
     return (
       <section className="mt-10">
         <div className="bracket">Shopify — Not Connected</div>
@@ -94,7 +106,7 @@ export function ShopifyLiveSection({ timeframe }: { timeframe: Timeframe }) {
               Connect Shopify to see live data here
             </div>
             <div className="mt-1 text-[12px] text-white/50">
-              Revenue, AOV, order count, fulfillment SLA, and more will appear
+              Revenue, AOV, Returns, Orders, and Conversion Rate will appear
               once credentials are saved.
             </div>
           </div>
@@ -113,13 +125,8 @@ export function ShopifyLiveSection({ timeframe }: { timeframe: Timeframe }) {
           <div className="bracket text-[#96bf48]">Shopify — Live</div>
           <h2 className="section-title mt-1">Store Metrics</h2>
           <p className="mt-1 text-sm text-white/50">
-            Pulled directly from the Shopify Admin API
-            {summary?.dateRange && (
-              <>
-                {" · "}
-                {summary.dateRange.start} → {summary.dateRange.end}
-              </>
-            )}
+            Pulled directly from the Shopify Admin API · compared across time
+            windows
             {summary?.source === "simulated" && (
               <span className="ml-2 text-warn">(simulated fallback)</span>
             )}
@@ -144,49 +151,61 @@ export function ShopifyLiveSection({ timeframe }: { timeframe: Timeframe }) {
 
       {summary && (
         <>
-          {/* Metric tiles */}
-          <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
-            <MetricTile
-              label="Revenue"
-              value={`$${formatValue(summary.totals.revenue, "currency").replace("$", "")}`}
-              hint={`${summary.dateRange.days} days`}
-              icon={<DollarSign size={16} />}
-              accent="#96bf48"
-            />
-            <MetricTile
-              label="Orders"
-              value={summary.totals.orders.toLocaleString()}
-              hint={`${Math.round(summary.totals.orders / Math.max(1, summary.dateRange.days))} / day avg`}
-              icon={<ShoppingBag size={16} />}
-              accent="#f8c808"
-            />
-            <MetricTile
-              label="AOV"
-              value={`$${Math.round(summary.totals.aov).toLocaleString()}`}
-              hint="Revenue ÷ Orders"
-              icon={<Receipt size={16} />}
-              accent="#10a0f8"
-            />
-            <MetricTile
-              label="Fulfillment SLA"
-              value={`${summary.totals.fulfillmentSLAPct}%`}
-              hint="Within 24h of order"
-              icon={<Truck size={16} />}
-              accent={summary.totals.fulfillmentSLAPct >= 95 ? "#48f088" : "#f8c808"}
-            />
-            <MetricTile
-              label="Paid Ratio"
-              value={`${summary.totals.paidRatioPct}%`}
-              hint="Checkout proxy"
-              icon={<Package size={16} />}
-              accent="#f06020"
-            />
+          {/* Metric × Timeframe matrix */}
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full border-separate border-spacing-0">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-10 border-b border-white/10 bg-jet-900 px-4 py-2 text-left font-heading text-[10px] uppercase tracking-brand text-white/50">
+                    Metric
+                  </th>
+                  {WINDOW_COLUMNS.map((w) => (
+                    <th
+                      key={w.key}
+                      className="border-b border-white/10 bg-jet-900 px-4 py-2 text-right font-heading text-[10px] uppercase tracking-brand text-white/50"
+                    >
+                      {w.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {METRIC_ROWS.map((m, i) => {
+                  const isLast = i === METRIC_ROWS.length - 1;
+                  return (
+                    <tr key={m.key}>
+                      <td
+                        className={`sticky left-0 z-10 bg-jet-900 px-4 py-3 font-heading text-[12px] font-semibold uppercase tracking-brand text-white ${
+                          isLast ? "" : "border-b border-white/5"
+                        }`}
+                      >
+                        {m.label}
+                      </td>
+                      {WINDOW_COLUMNS.map((w) => {
+                        const win = summary.windows[w.key];
+                        const value = win ? (win as any)[m.key] : null;
+                        return (
+                          <td
+                            key={w.key}
+                            className={`px-4 py-3 text-right font-numeric text-base text-white ${
+                              isLast ? "" : "border-b border-white/5"
+                            }`}
+                          >
+                            {formatMetric(value, m.kind)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          {/* Revenue sparkline */}
+          {/* Daily revenue chart */}
           <div className="mt-4 card p-5">
             <div className="flex items-center justify-between">
-              <div className="bracket text-[#96bf48]">Daily Revenue</div>
+              <div className="bracket text-[#96bf48]">Daily Revenue · Last 30 Days</div>
               <div className="font-numeric text-[11px] text-white/50">
                 Peak: $
                 {Math.max(...summary.samples.map((s) => s.revenue)).toLocaleString()}
@@ -211,10 +230,7 @@ export function ShopifyLiveSection({ timeframe }: { timeframe: Timeframe }) {
                     minTickGap={24}
                   />
                   <Tooltip
-                    formatter={(v: number) => [
-                      `$${v.toLocaleString()}`,
-                      "Revenue",
-                    ]}
+                    formatter={(v: number) => [`$${v.toLocaleString()}`, "Revenue"]}
                     cursor={{ stroke: "rgba(255,255,255,0.15)" }}
                   />
                   <Area
@@ -231,10 +247,10 @@ export function ShopifyLiveSection({ timeframe }: { timeframe: Timeframe }) {
             </div>
           </div>
 
-          {/* Orders sparkline */}
+          {/* Daily orders chart */}
           <div className="mt-4 card p-5">
             <div className="flex items-center justify-between">
-              <div className="bracket">Daily Orders</div>
+              <div className="bracket">Daily Orders · Last 30 Days</div>
               <div className="font-numeric text-[11px] text-white/50">
                 Peak:{" "}
                 {Math.max(...summary.samples.map((s) => s.orders)).toLocaleString()}
@@ -280,7 +296,7 @@ export function ShopifyLiveSection({ timeframe }: { timeframe: Timeframe }) {
             {summary.source === "live" ? (
               <>
                 <CheckCircle2 size={12} className="text-ok" />
-                Pulled live from {shopify?.credentials?.SHOPIFY_SHOP}
+                Pulled live from Shopify · 30 days of history
               </>
             ) : (
               <>
@@ -295,40 +311,15 @@ export function ShopifyLiveSection({ timeframe }: { timeframe: Timeframe }) {
   );
 }
 
-function MetricTile({
-  label,
-  value,
-  hint,
-  icon,
-  accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  icon?: React.ReactNode;
-  accent?: string;
-}) {
-  return (
-    <div className="card relative p-4">
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-[2px]"
-        style={{ background: accent || "#f8c808" }}
-      />
-      <div className="flex items-center justify-between">
-        <div className="bracket">{label}</div>
-        <div className="border border-white/10 bg-white/[0.02] p-1.5 text-white/70">
-          {icon}
-        </div>
-      </div>
-      <div className="mt-2 font-numeric text-2xl font-bold text-white">
-        {value}
-      </div>
-      {hint && (
-        <div className="mt-1 font-heading text-[10px] uppercase tracking-brand text-white/50">
-          {hint}
-        </div>
-      )}
-    </div>
-  );
+function formatMetric(
+  value: number | null | undefined,
+  kind: "currency" | "number" | "percent",
+): string {
+  if (value === null || value === undefined) return "—";
+  if (kind === "currency") {
+    if (value === 0) return "$0";
+    return `$${formatValue(value, "currency").replace("$", "")}`;
+  }
+  if (kind === "percent") return `${value.toFixed(2)}%`;
+  return value.toLocaleString();
 }
