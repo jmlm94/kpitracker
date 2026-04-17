@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 /**
- * Focused probe: the /attribution/get-orders-with-journeys-v2 endpoint
- * exists (we got 403 instead of 404). Try every auth + body variation
- * to find the combo that returns 200.
+ * Probe Triple Whale auth exchange endpoints. The fact that Bearer auth
+ * returned "Invalid iss" (a JWT claim error) suggests the API wants a
+ * JWT — likely obtained by exchanging the API key via an auth endpoint.
  */
 export async function GET() {
   const apiKey = process.env.TRIPLEWHALE_API_KEY;
@@ -17,75 +17,53 @@ export async function GET() {
 
   const baseUrl = "https://api.triplewhale.com/api/v2";
 
-  const bodies: { label: string; body: any }[] = [
-    { label: "shopDomain+dates", body: { shopDomain: shopId, startDate: "2026-04-01", endDate: "2026-04-14" } },
-    { label: "shop_domain+dates", body: { shop_domain: shopId, start_date: "2026-04-01", end_date: "2026-04-14" } },
-    { label: "shopId+startDate", body: { shopId, startDate: "2026-04-01", endDate: "2026-04-14" } },
-    { label: "just shopDomain", body: { shopDomain: shopId } },
-    { label: "empty", body: {} },
+  const tests = [
+    // Common auth exchange patterns
+    { name: "auth-api-keys-exchange", url: `${baseUrl}/auth/api-keys/exchange`, method: "POST", headers: { "Content-Type": "application/json" }, body: { apiKey } },
+    { name: "auth-token", url: `${baseUrl}/auth/token`, method: "POST", headers: { "Content-Type": "application/json" }, body: { api_key: apiKey, shopDomain: shopId } },
+    { name: "auth-login", url: `${baseUrl}/auth/login`, method: "POST", headers: { "Content-Type": "application/json" }, body: { apiKey, shopDomain: shopId } },
+    { name: "auth-oauth-token", url: `${baseUrl}/oauth/token`, method: "POST", headers: { "Content-Type": "application/json" }, body: { grant_type: "api_key", api_key: apiKey } },
+    { name: "auth-service-token", url: `${baseUrl}/users/get-token`, method: "POST", headers: { "x-api-key": apiKey, "Content-Type": "application/json" }, body: { shopDomain: shopId } },
+    { name: "auth-api-key-token", url: `${baseUrl}/auth/api-key-to-token`, method: "POST", headers: { "Content-Type": "application/json" }, body: { apiKey } },
+    { name: "service-token", url: `${baseUrl}/willy/get-service-token`, method: "POST", headers: { "x-api-key": apiKey, "Content-Type": "application/json" }, body: { shopId } },
+    { name: "signin", url: `${baseUrl}/signin`, method: "POST", headers: { "Content-Type": "application/json" }, body: { apiKey } },
+    // Try "chat" endpoint too since TW has the Willy AI
+    { name: "willy-answer", url: `${baseUrl}/willy/answer-nlq-question`, method: "POST", headers: { "x-api-key": apiKey, "Content-Type": "application/json" }, body: { shopId, question: "What is my ROAS today?" } },
+    { name: "willy-generate", url: `${baseUrl}/willy/generate`, method: "POST", headers: { "x-api-key": apiKey, "Content-Type": "application/json" }, body: { shopId, question: "ROAS" } },
+    // Different base
+    { name: "v2-sonar-get-sales-attribution", url: `${baseUrl}/sonar/get-sales-attribution-by-order`, method: "POST", headers: { "x-api-key": apiKey, "Content-Type": "application/json" }, body: { shopDomain: shopId, startDate: "2026-04-01", endDate: "2026-04-14" } },
   ];
 
-  const authHeaders: { label: string; headers: Record<string, string> }[] = [
-    { label: "x-api-key", headers: { "x-api-key": apiKey } },
-    { label: "Bearer", headers: { Authorization: `Bearer ${apiKey}` } },
-    { label: "api-key", headers: { "api-key": apiKey } },
-    { label: "Authorization-raw", headers: { Authorization: apiKey } },
-    { label: "x-tw-api-key", headers: { "x-tw-api-key": apiKey } },
-  ];
-
-  const endpoints = [
-    "/attribution/get-orders-with-journeys-v2",
-    "/attribution/get-orders-with-journeys",
-    "/sonar/get-sales-attribution-by-order",
-    "/attribution/stats",
-    "/summary-page/get-summary-page",
-    "/tw-metrics/metrics-data",
-  ];
-
-  type Result = { endpoint: string; auth: string; body: string; status: number | null; error?: string; snippet?: string };
-  const results: Result[] = [];
-
-  for (const ep of endpoints) {
-    for (const a of authHeaders) {
-      for (const b of bodies) {
-        try {
-          const res = await fetch(`${baseUrl}${ep}`, {
-            method: "POST",
-            headers: { ...a.headers, "Content-Type": "application/json" },
-            body: JSON.stringify(b.body),
-          });
-          const text = await res.text();
-          // Only record interesting results (not 404)
-          if (res.status !== 404) {
-            results.push({
-              endpoint: ep,
-              auth: a.label,
-              body: b.label,
-              status: res.status,
-              snippet: text.slice(0, 200),
-            });
-          }
-        } catch (e: any) {
-          results.push({
-            endpoint: ep,
-            auth: a.label,
-            body: b.label,
-            status: null,
-            error: e?.message,
-          });
-        }
+  const results: any[] = [];
+  await Promise.all(
+    tests.map(async (t) => {
+      try {
+        const res = await fetch(t.url, {
+          method: t.method,
+          headers: t.headers,
+          body: t.body ? JSON.stringify(t.body) : undefined,
+        });
+        const text = await res.text();
+        results.push({
+          name: t.name,
+          url: t.url,
+          status: res.status,
+          snippet: text.slice(0, 200),
+        });
+      } catch (e: any) {
+        results.push({ name: t.name, url: t.url, error: e?.message });
       }
-    }
-  }
+    }),
+  );
 
-  // Sort by status ascending (200s first)
-  results.sort((a, b) => (a.status ?? 9999) - (b.status ?? 9999));
-
-  return NextResponse.json({
-    shopId,
-    apiKeyLength: apiKey.length,
-    totalTests: endpoints.length * authHeaders.length * bodies.length,
-    interestingResults: results.length,
-    results,
+  // Sort 2xx first, then 3xx, then rest
+  results.sort((a, b) => {
+    const sa = a.status ?? 9999;
+    const sb = b.status ?? 9999;
+    if (sa < 400 && sb >= 400) return -1;
+    if (sa >= 400 && sb < 400) return 1;
+    return sa - sb;
   });
+
+  return NextResponse.json({ shopId, results });
 }
