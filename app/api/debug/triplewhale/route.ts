@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 /**
- * Broad endpoint discovery for the Triple Whale API. Tries many paths +
- * auth variations so we can pinpoint the one(s) that work.
+ * Focused probe: the /attribution/get-orders-with-journeys-v2 endpoint
+ * exists (we got 403 instead of 404). Try every auth + body variation
+ * to find the combo that returns 200.
  */
 export async function GET() {
   const apiKey = process.env.TRIPLEWHALE_API_KEY;
@@ -14,70 +15,77 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "TRIPLEWHALE_API_KEY not set" }, { status: 400 });
   }
 
-  const commonHeadersXKey = { "x-api-key": apiKey, "Content-Type": "application/json" };
+  const baseUrl = "https://api.triplewhale.com/api/v2";
 
-  type Test = {
-    name: string;
-    url: string;
-    method: "GET" | "POST";
-    headers?: Record<string, string>;
-    body?: any;
-  };
-
-  const tests: Test[] = [
-    // v1 users
-    { name: "v1-users-me",       url: "https://api.triplewhale.com/api/v1/users/me",        method: "GET", headers: commonHeadersXKey },
-    // v2 users
-    { name: "v2-users-me",       url: "https://api.triplewhale.com/api/v2/users/me",        method: "GET", headers: commonHeadersXKey },
-    // no /api prefix
-    { name: "v1-no-api-me",      url: "https://api.triplewhale.com/v1/users/me",            method: "GET", headers: commonHeadersXKey },
-    { name: "v2-no-api-me",      url: "https://api.triplewhale.com/v2/users/me",            method: "GET", headers: commonHeadersXKey },
-    // Attribution
-    { name: "v2-attribution",    url: "https://api.triplewhale.com/api/v2/attribution/get-orders-with-journeys-v2", method: "POST", headers: commonHeadersXKey, body: { shopDomain: shopId } },
-    // Sonar
-    { name: "v2-sonar-metrics",  url: "https://api.triplewhale.com/api/v2/sonar/get-metrics", method: "POST", headers: commonHeadersXKey, body: { shopDomain: shopId } },
-    // Metrics
-    { name: "v2-metrics-data",   url: "https://api.triplewhale.com/api/v2/metrics/get-metrics-data", method: "POST", headers: commonHeadersXKey, body: { shop_domain: shopId } },
-    // Willy (AI)
-    { name: "v2-willy-question", url: "https://api.triplewhale.com/api/v2/willy/question", method: "POST", headers: commonHeadersXKey, body: { shopId, question: "What is my ROAS?" } },
-    // Summary variations
-    { name: "v2-summary-hyphen", url: "https://api.triplewhale.com/api/v2/summary/get-summary", method: "POST", headers: commonHeadersXKey, body: { shopDomain: shopId } },
-    { name: "v2-reports",        url: "https://api.triplewhale.com/api/v2/reports",         method: "GET", headers: commonHeadersXKey },
-    // Root discovery
-    { name: "root-api",          url: "https://api.triplewhale.com/api",                    method: "GET", headers: commonHeadersXKey },
-    { name: "root-api-v2",       url: "https://api.triplewhale.com/api/v2",                 method: "GET", headers: commonHeadersXKey },
-    // Different host
-    { name: "alt-host-developers",url:"https://developers.triplewhale.com/api/v2/users/me", method: "GET", headers: commonHeadersXKey },
-    // Health/status probes
-    { name: "health",            url: "https://api.triplewhale.com/health",                 method: "GET", headers: commonHeadersXKey },
-    { name: "status",            url: "https://api.triplewhale.com/status",                 method: "GET", headers: commonHeadersXKey },
+  const bodies: { label: string; body: any }[] = [
+    { label: "shopDomain+dates", body: { shopDomain: shopId, startDate: "2026-04-01", endDate: "2026-04-14" } },
+    { label: "shop_domain+dates", body: { shop_domain: shopId, start_date: "2026-04-01", end_date: "2026-04-14" } },
+    { label: "shopId+startDate", body: { shopId, startDate: "2026-04-01", endDate: "2026-04-14" } },
+    { label: "just shopDomain", body: { shopDomain: shopId } },
+    { label: "empty", body: {} },
   ];
 
-  const results: Record<string, any> = {};
-  await Promise.all(
-    tests.map(async (t) => {
-      try {
-        const res = await fetch(t.url, {
-          method: t.method,
-          headers: t.headers,
-          body: t.body ? JSON.stringify(t.body) : undefined,
-        });
-        const text = await res.text();
-        results[t.name] = {
-          url: t.url,
-          status: res.status,
-          body: text.slice(0, 250),
-        };
-      } catch (e: any) {
-        results[t.name] = { url: t.url, error: e?.message || "fetch failed" };
+  const authHeaders: { label: string; headers: Record<string, string> }[] = [
+    { label: "x-api-key", headers: { "x-api-key": apiKey } },
+    { label: "Bearer", headers: { Authorization: `Bearer ${apiKey}` } },
+    { label: "api-key", headers: { "api-key": apiKey } },
+    { label: "Authorization-raw", headers: { Authorization: apiKey } },
+    { label: "x-tw-api-key", headers: { "x-tw-api-key": apiKey } },
+  ];
+
+  const endpoints = [
+    "/attribution/get-orders-with-journeys-v2",
+    "/attribution/get-orders-with-journeys",
+    "/sonar/get-sales-attribution-by-order",
+    "/attribution/stats",
+    "/summary-page/get-summary-page",
+    "/tw-metrics/metrics-data",
+  ];
+
+  type Result = { endpoint: string; auth: string; body: string; status: number | null; error?: string; snippet?: string };
+  const results: Result[] = [];
+
+  for (const ep of endpoints) {
+    for (const a of authHeaders) {
+      for (const b of bodies) {
+        try {
+          const res = await fetch(`${baseUrl}${ep}`, {
+            method: "POST",
+            headers: { ...a.headers, "Content-Type": "application/json" },
+            body: JSON.stringify(b.body),
+          });
+          const text = await res.text();
+          // Only record interesting results (not 404)
+          if (res.status !== 404) {
+            results.push({
+              endpoint: ep,
+              auth: a.label,
+              body: b.label,
+              status: res.status,
+              snippet: text.slice(0, 200),
+            });
+          }
+        } catch (e: any) {
+          results.push({
+            endpoint: ep,
+            auth: a.label,
+            body: b.label,
+            status: null,
+            error: e?.message,
+          });
+        }
       }
-    }),
-  );
+    }
+  }
+
+  // Sort by status ascending (200s first)
+  results.sort((a, b) => (a.status ?? 9999) - (b.status ?? 9999));
 
   return NextResponse.json({
     shopId,
     apiKeyLength: apiKey.length,
-    apiKeyPrefix: apiKey.slice(0, 6) + "…",
-    tests: results,
+    totalTests: endpoints.length * authHeaders.length * bodies.length,
+    interestingResults: results.length,
+    results,
   });
 }
