@@ -77,16 +77,14 @@ export function TripleWhaleLiveSection({ timeframe: _ }: { timeframe: Timeframe 
           </div>
           <div className="flex-1">
             <div className="font-heading text-[13px] font-semibold uppercase tracking-brand text-white">
-              Connect Triple Whale to see ad performance here
+              Connect Triple Whale via Vercel env vars
             </div>
             <div className="mt-1 text-[12px] text-white/50">
-              ROAS, spend, revenue, CPA, and CTR across Meta, Google, TikTok,
-              Snap, and AppLovin.
+              Set <span className="kbd">TRIPLEWHALE_API_KEY</span> and{" "}
+              <span className="kbd">TRIPLEWHALE_SHOP_ID</span> in Vercel →
+              Settings → Environment Variables, then redeploy.
             </div>
           </div>
-          <a href="/integrations" className="btn-primary">
-            Connect
-          </a>
         </div>
       </section>
     );

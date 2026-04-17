@@ -103,16 +103,14 @@ export function ShopifyLiveSection({ timeframe: _ }: { timeframe: Timeframe }) {
           </div>
           <div className="flex-1">
             <div className="font-heading text-[13px] font-semibold uppercase tracking-brand text-white">
-              Connect Shopify to see live data here
+              Connect Shopify via Vercel env vars
             </div>
             <div className="mt-1 text-[12px] text-white/50">
-              Revenue, AOV, Returns, Orders, and Conversion Rate will appear
-              once credentials are saved.
+              Set <span className="kbd">SHOPIFY_SHOP</span> and{" "}
+              <span className="kbd">SHOPIFY_ADMIN_TOKEN</span> in Vercel →
+              Settings → Environment Variables, then redeploy.
             </div>
           </div>
-          <a href="/integrations" className="btn-primary">
-            Connect
-          </a>
         </div>
       </section>
     );

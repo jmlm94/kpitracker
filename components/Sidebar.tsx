@@ -7,7 +7,6 @@ import {
   Building2,
   Users,
   Target,
-  Plug,
   Network,
   Settings as SettingsIcon,
 } from "lucide-react";
@@ -20,8 +19,7 @@ const nav = [
   { href: "/team", label: "Team", icon: Users, code: "03" },
   { href: "/kpis", label: "KPIs & Targets", icon: Target, code: "04" },
   { href: "/org-chart", label: "Org Chart", icon: Network, code: "05" },
-  { href: "/integrations", label: "Integrations", icon: Plug, code: "06" },
-  { href: "/settings", label: "Settings", icon: SettingsIcon, code: "07" },
+  { href: "/settings", label: "Settings", icon: SettingsIcon, code: "06" },
 ];
 
 export function Sidebar() {
