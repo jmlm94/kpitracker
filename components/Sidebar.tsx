@@ -8,6 +8,7 @@ import {
   Users,
   Target,
   Network,
+  ClipboardCheck,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { Wordmark } from "./Logo";
@@ -19,7 +20,8 @@ const nav = [
   { href: "/team", label: "Team", icon: Users, code: "03" },
   { href: "/kpis", label: "KPIs & Targets", icon: Target, code: "04" },
   { href: "/org-chart", label: "Org Chart", icon: Network, code: "05" },
-  { href: "/settings", label: "Settings", icon: SettingsIcon, code: "06" },
+  { href: "/reports", label: "Reports", icon: ClipboardCheck, code: "06" },
+  { href: "/settings", label: "Settings", icon: SettingsIcon, code: "07" },
 ];
 
 export function Sidebar() {

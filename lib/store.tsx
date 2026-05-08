@@ -6,6 +6,7 @@ import type {
   Department,
   IntegrationConfig,
   KPI,
+  MonthlySubmission,
   Progress,
   Target,
   TeamMember,
@@ -32,6 +33,8 @@ type StoreValue = {
   setProgress: (targetId: string, p: Progress) => void;
   updateIntegration: (provider: string, patch: Partial<IntegrationConfig>) => void;
   markOnboarded: () => void;
+  upsertSubmission: (sub: MonthlySubmission) => void;
+  removeSubmission: (id: string) => void;
 };
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -54,6 +57,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           if (m.managerIds || !m.managerId) return m;
           return { ...m, managerIds: [m.managerId] };
         });
+        // Back-compat: submissions is a new field
+        if (!parsed.submissions) parsed.submissions = [];
         rawSetState(parsed);
       }
     } catch {
@@ -159,6 +164,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ),
         })),
       markOnboarded: () => setState((s) => ({ ...s, onboarded: true })),
+      upsertSubmission: (sub) =>
+        setState((s) => {
+          const list = s.submissions || [];
+          // Replace any existing submission for the same owner+period (one per month)
+          const filtered = list.filter(
+            (x) => !(x.ownerId === sub.ownerId && x.periodKey === sub.periodKey && x.id !== sub.id),
+          );
+          const exists = filtered.some((x) => x.id === sub.id);
+          const next = exists
+            ? filtered.map((x) => (x.id === sub.id ? sub : x))
+            : [...filtered, sub];
+          return { ...s, submissions: next };
+        }),
+      removeSubmission: (id) =>
+        setState((s) => ({
+          ...s,
+          submissions: (s.submissions || []).filter((x) => x.id !== id),
+        })),
     };
   }, [state, ready]);
 

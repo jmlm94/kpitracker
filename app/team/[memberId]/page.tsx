@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store";
 import { KPICard } from "@/components/KPICard";
 import { Avatar } from "@/components/Avatar";
 import { TimeframeSelector } from "@/components/TimeframeSelector";
+import { MonthlyReportForm } from "@/components/MonthlyReportForm";
 import {
   classifyStatus,
   progressRatio,
@@ -129,6 +130,9 @@ export default function TeamMemberPage() {
           </span>
         </div>
       </div>
+
+      {/* Monthly self-report form */}
+      <MonthlyReportForm member={member} />
 
       {/* Timeframe selector */}
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">

@@ -91,6 +91,23 @@ export type IntegrationConfig = {
   lastSyncMessage?: string;
 };
 
+/**
+ * Monthly self-report. Each team member fills out their actual numbers for
+ * the month against the targets they own. Stored per-period so the CEO can
+ * scroll back through prior months.
+ */
+export type MonthlySubmission = {
+  id: string;
+  ownerId: string;
+  /** "2026-04" — calendar month being reported */
+  periodKey: string;
+  submittedAt: string;
+  /** Reported value keyed by target id */
+  values: Record<string, number>;
+  /** Optional context the team member adds */
+  notes?: string;
+};
+
 export type AppState = {
   onboarded: boolean;
   departments: Department[];
@@ -99,4 +116,6 @@ export type AppState = {
   targets: Target[];
   progress: Record<string, Progress>; // keyed by targetId
   integrations: IntegrationConfig[];
+  /** Monthly self-reported KPI submissions, keyed by id */
+  submissions?: MonthlySubmission[];
 };

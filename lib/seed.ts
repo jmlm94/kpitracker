@@ -1,15 +1,12 @@
 import type { AppState, KPI, Target, TeamMember, Department } from "./types";
 
 /**
- * Seed state for Carbinox, using the real org roster.
+ * Seed data — Carbinox roster + KPIs straight from
+ * Carbinox_Performance_KPIs.pdf (April 2026).
  *
- * Business context: DTC smartwatch brand, Miami FL. Revenue mix Shopify 60%
- * / Amazon 35% / Other 5%. Revenue loop = Creative → Advertising →
- * Website → Organic/Retention → Other Channels → Logistics → CS → Finance.
- *
- * A number of people wear multiple hats (the primary `departmentId` is
- * their home base; additional KPIs they own are listed on the same team
- * member record and show up on whichever department those KPIs belong to).
+ * Targets are the monthly numbers from the PDF. KPIs are intentionally
+ * scoped tight (3-5 per role). Open seats (COO, CMO, CRO, Head of Creative,
+ * etc.) are not seeded — they'll be added when filled.
  */
 
 const PERIOD = currentMonthKey();
@@ -17,238 +14,342 @@ const PERIOD = currentMonthKey();
 const departments: Department[] = [
   // Main departments
   { id: "dep_exec", name: "Executive", color: "#f8f8f8", kind: "main", headId: "tm_jose" },
-  { id: "dep_marketing", name: "Marketing", color: "#f8c808", kind: "main", headId: "tm_jose" },
-  { id: "dep_experience", name: "Experience", color: "#ffd833", kind: "main", headId: "tm_thaylu" },
-  { id: "dep_website", name: "Website", color: "#48f088", kind: "main", headId: "tm_damian" },
-  { id: "dep_channels", name: "Other Channels", color: "#d0f800", kind: "main", headId: "tm_gyorgy" },
-  { id: "dep_logistics", name: "Logistics", color: "#408038", kind: "main", headId: "tm_thaylu" },
-  { id: "dep_finance", name: "Finance", color: "#ffffff", kind: "main", headId: "tm_jaime" },
+  { id: "dep_marketing", name: "Marketing & Advertising", color: "#f8c808", kind: "main", headId: "tm_damian" },
+  { id: "dep_retention", name: "Retention", color: "#10a0f8", kind: "main", headId: "tm_samra" },
+  { id: "dep_cx", name: "Customer Experience", color: "#ffd833", kind: "main", headId: "tm_doralee" },
+  { id: "dep_revenue", name: "Revenue", color: "#48f088", kind: "main", headId: "tm_damian" },
+  { id: "dep_finops", name: "Finance & Operations", color: "#a78bfa", kind: "main", headId: "tm_jaime" },
 
-  // Marketing sub-departments
+  // Marketing & Advertising sub-departments
   { id: "dep_advertising", name: "Advertising", color: "#f06020", kind: "sub", parentId: "dep_marketing", headId: "tm_damian" },
-  { id: "dep_creative", name: "Creative", color: "#e83028", kind: "sub", parentId: "dep_marketing", headId: "tm_jose" },
-  { id: "dep_organic", name: "Organic & Retention", color: "#10a0f8", kind: "sub", parentId: "dep_marketing", headId: "tm_jose" },
+  { id: "dep_creative", name: "Creative", color: "#e83028", kind: "sub", parentId: "dep_marketing" },
+  { id: "dep_content", name: "Content & Affiliate", color: "#d0f800", kind: "sub", parentId: "dep_marketing" },
 
-  // Experience sub-departments
-  { id: "dep_cs", name: "Customer Success", color: "#ffd833", kind: "sub", parentId: "dep_experience", headId: "tm_doralee" },
-  { id: "dep_team_success", name: "Team Success", color: "#ff6b4a", kind: "sub", parentId: "dep_experience", headId: "tm_thaylu" },
+  // Customer Experience sub-departments
+  { id: "dep_cs", name: "Customer Success", color: "#ffd833", kind: "sub", parentId: "dep_cx", headId: "tm_doralee" },
+  { id: "dep_team_success", name: "Team Success", color: "#ff6b4a", kind: "sub", parentId: "dep_cx", headId: "tm_thaylu" },
 
-  // Website sub-departments
-  { id: "dep_lp", name: "Landing Pages", color: "#34d399", kind: "sub", parentId: "dep_website", headId: "tm_damian" },
-  { id: "dep_cro", name: "CRO", color: "#2dd4bf", kind: "sub", parentId: "dep_website", headId: "tm_jesus_m" },
+  // Revenue sub-departments
+  { id: "dep_website", name: "Website", color: "#34d399", kind: "sub", parentId: "dep_revenue", headId: "tm_damian" },
+  { id: "dep_marketplaces", name: "Marketplaces", color: "#2dd4bf", kind: "sub", parentId: "dep_revenue", headId: "tm_gyorgy" },
 
-  // Other Channels sub-departments
-  { id: "dep_amazon", name: "Amazon", color: "#ff9900", kind: "sub", parentId: "dep_channels", headId: "tm_gyorgy" },
-  { id: "dep_ttshop", name: "TikTok Shop", color: "#e83028", kind: "sub", parentId: "dep_channels", headId: "tm_gyorgy" },
-  { id: "dep_marketplace", name: "Walmart & Other", color: "#10a0f8", kind: "sub", parentId: "dep_channels", headId: "tm_gyorgy" },
-
-  // Logistics sub-departments
-  { id: "dep_supply", name: "Supply Chain", color: "#86efac", kind: "sub", parentId: "dep_logistics", headId: "tm_thaylu" },
-  { id: "dep_fulfillment", name: "Fulfillment", color: "#4ade80", kind: "sub", parentId: "dep_logistics", headId: "tm_evelyn" },
+  // Finance & Operations sub-departments
+  { id: "dep_finance", name: "Finance", color: "#ffffff", kind: "sub", parentId: "dep_finops", headId: "tm_jaime" },
+  { id: "dep_logistics", name: "Logistics", color: "#86efac", kind: "sub", parentId: "dep_finops", headId: "tm_evelyn" },
+  { id: "dep_supply_chain", name: "Supply Chain", color: "#4ade80", kind: "sub", parentId: "dep_finops", headId: "tm_thaylu" },
 ];
 
 const team: TeamMember[] = [
   // Executive
-  { id: "tm_jose", name: "Jose Lepage", position: "CEO", departmentId: "dep_exec", additionalDepartmentIds: ["dep_marketing", "dep_creative", "dep_organic"] },
-  // Thaylu wears multiple hats: EA + Head of Experience + Head of Team Success + Head of Logistics + Head of Supply Chain
-  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Executive Assistant · Head of Experience · Logistics · Supply Chain", departmentId: "dep_exec", additionalDepartmentIds: ["dep_experience", "dep_team_success", "dep_logistics", "dep_supply"], managerIds: ["tm_jose"] },
+  { id: "tm_jose", name: "Jose Lepage", position: "CEO", departmentId: "dep_exec" },
+  // Thaylu wears multiple hats: EA / Acting CXO / Head of Team Success / Head of Supply Chain
+  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Acting CXO · Head of Team Success · Head of Supply Chain", departmentId: "dep_exec", additionalDepartmentIds: ["dep_team_success", "dep_supply_chain"], managerIds: ["tm_jose"] },
+
+  // Marketing & Advertising — Advertising
+  // Damian: Head of Advertising (primary) + TikTok/AppLovin/Reddit Buyer + Head of Website
+  { id: "tm_damian", name: "Damian Perez", position: "Head of Advertising · Head of Website · TikTok / AppLovin / Reddit Buyer", departmentId: "dep_advertising", additionalDepartmentIds: ["dep_website"], managerIds: ["tm_jose"] },
+  { id: "tm_simona", name: "Simona Saule", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
+  { id: "tm_kristaps", name: "Kristaps Krauklis", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
+  { id: "tm_ivana", name: "Ivana Vitali", position: "Google Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
+
+  // Creative — Strategists + Video Editors + Graphic Designer
+  { id: "tm_oli", name: "Oli Cimet", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+  { id: "tm_malu", name: "Malu Celestino", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+  { id: "tm_maria", name: "Maria Paula Dominguez", position: "Creative Strategist · TikTok Shop Specialist", departmentId: "dep_creative", additionalDepartmentIds: ["dep_content"], managerIds: ["tm_damian"] },
+  { id: "tm_dante", name: "Dante Vilar", position: "Creative Strategist · Video Editor", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+  { id: "tm_pedro", name: "Pedro Raze", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+  { id: "tm_sami", name: "Sami Mughal", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+  { id: "tm_paul", name: "Paul R.", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+  { id: "tm_winder", name: "Winder Buznego", position: "Graphic Designer", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+
+  // Content & Affiliate
+  { id: "tm_jesus_dw", name: "Jesus de Windt", position: "Content Manager · TikTok Shop Specialist", departmentId: "dep_content", managerIds: ["tm_damian"] },
+
+  // Retention
+  { id: "tm_samra", name: "Samra Zuga", position: "Email & SMS Specialist", departmentId: "dep_retention", managerIds: ["tm_jose"] },
+
+  // Customer Success
+  { id: "tm_doralee", name: "Doralee Clemente", position: "Head of CX Success", departmentId: "dep_cs", managerIds: ["tm_thaylu"] },
+  { id: "tm_anthony", name: "Anthony Burac", position: "CX Representative", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
+  { id: "tm_justine", name: "Justine Formacion", position: "CX Representative", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
+  { id: "tm_juan", name: "Juan Urena", position: "CX Representative", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
+  { id: "tm_felipe", name: "Felipe Osorio", position: "CX Representative", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
+
+  // Marketplaces
+  { id: "tm_gyorgy", name: "Gyorgy Vagovits", position: "Head of Marketplaces", departmentId: "dep_marketplaces", managerIds: ["tm_jose"] },
 
   // Finance
   { id: "tm_jaime", name: "Jaime Trujillo", position: "Fractional CFO", departmentId: "dep_finance", managerIds: ["tm_jose"] },
-  // Gyorgy: Finance primary + Other Channels (main + 3 subs)
-  { id: "tm_gyorgy", name: "Gyorgy Vagovits", position: "Finance Manager · Amazon / TTS / Walmart Manager", departmentId: "dep_finance", additionalDepartmentIds: ["dep_channels", "dep_amazon", "dep_ttshop", "dep_marketplace"], managerIds: ["tm_jaime"] },
 
-  // Advertising
-  // Damian: Head of Advertising primary + AppLovin (Advertising) + LP Specialist (Website main + LP sub)
-  { id: "tm_damian", name: "Damian Perez", position: "Head of Advertising · AppLovin · LP Specialist", departmentId: "dep_advertising", additionalDepartmentIds: ["dep_website", "dep_lp"], managerIds: ["tm_jose"] },
-  { id: "tm_simona", name: "Simona Saule", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
-  { id: "tm_kristaps", name: "Kristaps Krauklis", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
-  { id: "tm_ivana", name: "Ivana Vitali", position: "Google & TikTok Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
-
-  // Creative — Jose is the head; three Creative Strategists each lead their own pod
-  { id: "tm_oli", name: "Oli Cimet", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_jose"] },
-  { id: "tm_malu", name: "Malu Celestino", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_jose"] },
-  { id: "tm_maria", name: "Maria Paula Dominguez", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_jose"] },
-  // Dante: dual role (Video Editor + Creative Strategist), reports to Malu, has Sami under
-  { id: "tm_dante", name: "Dante Vilar", position: "Video Editor · Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_malu"] },
-  { id: "tm_sami", name: "Sami Mughal", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_dante"] },
-  { id: "tm_pedro", name: "Pedro Raze", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_maria"] },
-  { id: "tm_paul", name: "Paul R.", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_oli"] },
-  // Winder reports to Oli, Malu, AND Maria (shared graphic designer)
-  { id: "tm_winder", name: "Winder Buznego", position: "Graphic Designer", departmentId: "dep_creative", managerIds: ["tm_oli", "tm_malu", "tm_maria"] },
-  // Jesus de Windt: Content Strategist (Creative) + Social Media Manager (Organic). No reports.
-  { id: "tm_jesus_dw", name: "Jesus de Windt", position: "Content Strategist · Social Media Manager", departmentId: "dep_creative", additionalDepartmentIds: ["dep_organic"], managerIds: ["tm_jose"] },
-
-  // Organic & Retention — Jose is head
-  { id: "tm_samra", name: "Samra Zuga", position: "Email & SMS Specialist", departmentId: "dep_organic", managerIds: ["tm_jose"] },
-  { id: "tm_sharon", name: "Sharon", position: "Copywriter", departmentId: "dep_organic", managerIds: ["tm_samra"] },
-
-  // Customer Success — Doralee leads CS; reports to Thaylu (head of Experience)
-  { id: "tm_doralee", name: "Doralee Clemente", position: "Head of Customer Success", departmentId: "dep_cs", managerIds: ["tm_thaylu"] },
-  { id: "tm_justine", name: "Justine Formacion", position: "CS Rep", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
-  { id: "tm_juan", name: "Juan Urena", position: "CS Rep", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
-  { id: "tm_felipe", name: "Felipe Osorio", position: "CS Rep", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
-  { id: "tm_anthony", name: "Anthony Burcac", position: "CS Rep", departmentId: "dep_cs", managerIds: ["tm_doralee"] },
-
-  // Website — LP (Damian above) + CRO
-  { id: "tm_jesus_m", name: "Jesus Mendoza", position: "CRO Specialist", departmentId: "dep_cro", managerIds: ["tm_jose"] },
-  { id: "tm_mateo", name: "Mateo Costa", position: "CRO Specialist", departmentId: "dep_cro", managerIds: ["tm_jose"] },
-
-  // Logistics → Fulfillment
-  { id: "tm_evelyn", name: "Evelyn Marin", position: "Warehouse Manager", departmentId: "dep_fulfillment", managerIds: ["tm_thaylu"] },
-  { id: "tm_heidi", name: "Heidi Aguilera", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerIds: ["tm_evelyn"] },
-  { id: "tm_miet", name: "Miet Aguilera", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerIds: ["tm_evelyn"] },
-  { id: "tm_jose_torres", name: "Jose Torres", position: "Warehouse Rep", departmentId: "dep_fulfillment", managerIds: ["tm_evelyn"] },
+  // Logistics
+  { id: "tm_evelyn", name: "Evelyn Marin", position: "Head of Logistics", departmentId: "dep_logistics", managerIds: ["tm_thaylu"] },
 ];
 
 type KpiSpec = KPI & {
   target: number;
   ownerId: string;
   watcherIds?: string[];
+  /** What dept this target is logged under */
+  targetDepartmentId?: string;
+  /** Initial values for this month — actual data from connectors will override */
   today: number;
   last7: number;
   mtd: number;
 };
 
 const kpiSpecs: KpiSpec[] = [
-  // ── ADVERTISING ─────────────────────────────────────────────────────
-  k("meta_roas", "Meta ROAS", "Blended Meta ROAS (prospecting + retargeting)", "ratio", "higher_is_better", "triplewhale", "meta.roas", "mtd",
-    2.5, "tm_simona", ["tm_kristaps", "tm_damian", "tm_jose"], 1.2, 1.63, 2.38),
-  k("meta_spend", "Meta Ad Spend", "Monthly Meta budget deployed", "currency", "higher_is_better", "triplewhale", "meta.spend", "mtd",
-    320000, "tm_simona", ["tm_kristaps", "tm_damian"], 9800, 10500, 296000),
-  k("meta_cpa", "Meta CPA", "Cost per new customer acquired via Meta", "currency", "lower_is_better", "triplewhale", "meta.cpa", "mtd",
-    50, "tm_simona", ["tm_kristaps", "tm_damian"], 58, 51, 49),
-  k("meta_ctr", "Meta CTR", "Link click-through rate across Meta ads", "percent", "higher_is_better", "triplewhale", "meta.ctr", "mtd",
-    1.2, "tm_simona", ["tm_kristaps", "tm_damian"], 1.1, 1.18, 1.24),
-  k("google_roas", "Google ROAS", "Revenue/spend across Search, Shopping, YouTube, Bing", "ratio", "higher_is_better", "triplewhale", "google.roas", "mtd",
-    3.0, "tm_ivana", ["tm_damian"], 3.2, 3.05, 3.12),
-  k("google_cpa_brand", "Google Branded CPA", "Cost per acquisition on branded search", "currency", "lower_is_better", "triplewhale", "google.cpa_branded", "mtd",
-    40, "tm_ivana", ["tm_damian"], 38, 41, 39),
-  k("tiktok_roas", "TikTok ROAS", "Revenue per dollar on TikTok ads", "ratio", "higher_is_better", "triplewhale", "tiktok.roas", "mtd",
-    2.0, "tm_ivana", ["tm_damian"], 1.7, 1.85, 1.92),
-  k("tiktok_hook", "TikTok Hook Rate", "3-sec view rate on TikTok ads", "percent", "higher_is_better", "triplewhale", "tiktok.hook_rate", "mtd",
-    30, "tm_ivana", ["tm_damian", "tm_oli"], 28, 31, 32),
-  k("snap_roas", "Snap ROAS", "Revenue per dollar spent on Snapchat ads", "ratio", "higher_is_better", "triplewhale", "snap.roas", "mtd",
-    2.0, "tm_simona", ["tm_kristaps", "tm_damian"], 1.9, 2.0, 2.08),
-  k("applovin_roas", "AppLovin ROAS", "Revenue per dollar on AppLovin network", "ratio", "higher_is_better", "triplewhale", "applovin.roas", "mtd",
-    2.0, "tm_damian", ["tm_jose"], 1.6, 1.8, 1.78),
-  k("blended_roas", "Blended ROAS", "Overall store ROAS across all channels", "ratio", "higher_is_better", "triplewhale", "blended.roas", "mtd",
-    3.0, "tm_damian", ["tm_jose"], 2.7, 2.9, 2.95),
+  // ── HEAD OF ADVERTISING — Damian ──────────────────────────────────────
+  k("blended_roas", "Blended ROAS", "Total revenue ÷ total ad spend across all platforms.", "ratio", "higher_is_better", "triplewhale", "blended.roas", "mtd",
+    2.28, "tm_damian", "dep_advertising", ["tm_jose"], 2.1, 2.2, 2.25),
+  k("nc_roas", "NC ROAS", "New customer revenue ÷ total ad spend.", "ratio", "higher_is_better", "triplewhale", "blended.nc_roas", "mtd",
+    1.9, "tm_damian", "dep_advertising", ["tm_jose"], 1.7, 1.8, 1.85),
+  k("blended_cac", "Blended CAC", "Total ad spend ÷ # of new customers acquired.", "currency", "lower_is_better", "triplewhale", "blended.cac", "mtd",
+    65, "tm_damian", "dep_advertising", ["tm_jose"], 70, 67, 66),
+  k("winning_creative_rate", "Winning Creative Rate", "% of creatives that beat control.", "percent", "higher_is_better", "gsheets", "creative.winning_rate", "mtd",
+    15, "tm_damian", "dep_advertising", ["tm_jose"], 12, 13, 14),
+  k("spend_pacing_blended", "Spend Pacing", "Actual monthly spend vs. forecasted (±10% of forecast).", "percent", "lower_is_better", "triplewhale", "blended.spend_pacing", "mtd",
+    10, "tm_damian", "dep_advertising", ["tm_jose"], 6, 7, 8),
 
-  // ── CREATIVE ────────────────────────────────────────────────────────
-  k("cs_win_rate", "Creative Win Rate", "% of launched creatives hitting ROAS/CPA targets in 72h", "percent", "higher_is_better", "gsheets", "creative.win_rate", "mtd",
-    20, "tm_oli", ["tm_malu", "tm_maria", "tm_jose"], 18, 21, 22),
-  k("briefs_week", "Briefs / Week", "New creative concepts briefed each week", "number", "higher_is_better", "gsheets", "creative.briefs_per_week", "7d",
-    5, "tm_oli", ["tm_malu", "tm_maria"], 1, 5, 4),
-  k("videos_week", "Videos Delivered / Week", "Finished video ads delivered to media buyers", "number", "higher_is_better", "gsheets", "creative.videos_per_week", "7d",
-    10, "tm_dante", ["tm_sami", "tm_pedro", "tm_paul", "tm_oli"], 2, 10, 9),
-  k("assets_week", "Static Assets / Week", "Image ads, banners, email graphics, LP visuals", "number", "higher_is_better", "gsheets", "creative.assets_per_week", "7d",
-    12, "tm_winder", ["tm_oli"], 3, 13, 11),
-  k("content_adherence", "Content Calendar Adherence", "Planned content published on schedule", "percent", "higher_is_better", "gsheets", "content.calendar_adherence", "mtd",
-    90, "tm_jesus_dw", ["tm_jose"], 92, 91, 92),
+  // ── META MEDIA BUYER — Simona / Kristaps ──────────────────────────────
+  k("meta_roas", "Meta Platform ROAS", "Meta revenue ÷ Meta spend.", "ratio", "higher_is_better", "triplewhale", "meta.roas", "mtd",
+    1.66, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 1.5, 1.6, 1.62),
+  k("meta_cac", "Meta CAC", "Meta spend ÷ new customers attributed to Meta.", "currency", "lower_is_better", "triplewhale", "meta.cac", "mtd",
+    65, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 70, 67, 66),
+  k("meta_pacing", "Meta Spend Pacing", "Actual Meta spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "meta.spend_pacing", "mtd",
+    10, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 6, 7, 8),
 
-  // ── ORGANIC / RETENTION ────────────────────────────────────────────
-  k("klaviyo_rev_pct", "Email Revenue % of Total", "Klaviyo attributed revenue share of DTC revenue", "percent", "higher_is_better", "klaviyo", "email.share_of_total", "mtd",
-    30, "tm_samra", ["tm_jose"], 28, 29, 31),
-  k("klaviyo_open", "Email Open Rate", "Average open rate across campaigns", "percent", "higher_is_better", "klaviyo", "email.open_rate", "mtd",
-    35, "tm_samra", ["tm_sharon"], 36, 35, 37),
-  k("klaviyo_click", "Email Click Rate", "Average click rate across campaigns", "percent", "higher_is_better", "klaviyo", "email.click_rate", "mtd",
-    2.5, "tm_samra", ["tm_sharon"], 2.4, 2.45, 2.62),
-  k("sms_rev_pct", "SMS Revenue % of Total", "Postscript attributed revenue share", "percent", "higher_is_better", "postscript", "sms.share_of_total", "mtd",
-    10, "tm_samra", [], 8, 9.5, 10.4),
-  k("sms_ctr", "SMS Click-Through Rate", "Recipients who click the SMS link", "percent", "higher_is_better", "postscript", "sms.ctr", "mtd",
-    10, "tm_samra", [], 9, 10, 10.2),
-  k("sms_optout", "SMS Opt-Out Rate", "Unsubscribes per campaign (lower is better)", "percent", "lower_is_better", "postscript", "sms.opt_out", "mtd",
-    2, "tm_samra", [], 1.8, 1.9, 1.7),
-  k("social_engagement", "Social Engagement Rate", "Engagement / reach across IG & TikTok organic", "percent", "higher_is_better", "gsheets", "social.engagement", "mtd",
-    3, "tm_jesus_dw", ["tm_jose"], 2.6, 2.9, 3.1),
-  k("social_followers", "Follower Growth MoM", "Net new followers as % of total", "percent", "higher_is_better", "gsheets", "social.follower_growth_mom", "mtd",
-    3, "tm_jesus_dw", [], 2.5, 2.8, 3.2),
+  // ── GOOGLE MEDIA BUYER — Ivana ────────────────────────────────────────
+  k("google_roas", "Google Platform ROAS", "Google revenue ÷ Google spend.", "ratio", "higher_is_better", "triplewhale", "google.roas", "mtd",
+    3.0, "tm_ivana", "dep_advertising", ["tm_damian"], 2.8, 2.9, 2.95),
+  k("google_cac", "Google CAC", "Google spend ÷ new customers attributed to Google.", "currency", "lower_is_better", "triplewhale", "google.cac", "mtd",
+    50, "tm_ivana", "dep_advertising", ["tm_damian"], 52, 51, 50),
+  k("google_pacing", "Google Spend Pacing", "Actual Google spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "google.spend_pacing", "mtd",
+    10, "tm_ivana", "dep_advertising", ["tm_damian"], 5, 6, 7),
 
-  // ── WEBSITE ─────────────────────────────────────────────────────────
-  k("lp_cvr", "Landing Page CVR", "Conversion rate on key landing pages", "percent", "higher_is_better", "shopify", "lp.conversion_rate", "mtd",
-    3.5, "tm_damian", ["tm_jose"], 3.2, 3.4, 3.55),
-  k("lp_speed", "Page Load Speed", "Mobile time-to-interactive (lower is better)", "duration_s", "lower_is_better", "gsheets", "lp.mobile_tti_s", "7d",
-    2.5, "tm_damian", [], 2.7, 2.6, 2.55),
-  k("site_cvr", "Sitewide CVR", "Blended Shopify conversion rate", "percent", "higher_is_better", "shopify", "site.conversion_rate", "mtd",
-    2.5, "tm_jesus_m", ["tm_mateo", "tm_jose"], 2.3, 2.45, 2.48),
-  k("ab_tests", "A/B Tests / Month", "Properly structured tests launched", "number", "higher_is_better", "gsheets", "cro.ab_tests_per_month", "mtd",
-    4, "tm_jesus_m", ["tm_mateo"], 0, 1, 4),
-  k("aov", "AOV", "Average order value across DTC", "currency", "higher_is_better", "shopify", "orders.aov", "mtd",
-    120, "tm_jesus_m", ["tm_mateo", "tm_jose"], 118, 121, 124),
-  k("checkout_rate", "Checkout Completion", "Started checkouts that complete", "percent", "higher_is_better", "shopify", "checkout.completion", "mtd",
-    55, "tm_jesus_m", ["tm_mateo"], 52, 54, 56),
+  // ── SNAP MEDIA BUYER — Simona / Kristaps ──────────────────────────────
+  k("snap_roas", "Snap Platform ROAS", "Snap revenue ÷ Snap spend.", "ratio", "higher_is_better", "triplewhale", "snap.roas", "mtd",
+    1.80, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 1.6, 1.7, 1.75),
+  k("snap_cac", "Snap CAC", "Snap spend ÷ new customers attributed to Snap.", "currency", "lower_is_better", "triplewhale", "snap.cac", "mtd",
+    75, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 80, 77, 76),
+  k("snap_pacing", "Snap Spend Pacing", "Actual Snap spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "snap.spend_pacing", "mtd",
+    10, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 6, 7, 8),
 
-  // ── OTHER CHANNELS ─────────────────────────────────────────────────
-  k("amazon_rev", "Amazon Revenue", "Total monthly revenue on Amazon", "currency", "higher_is_better", "gsheets", "amazon.revenue", "mtd",
-    525000, "tm_gyorgy", ["tm_jose"], 17200, 18600, 504000),
-  k("amazon_tacos", "Amazon TACoS", "Ad spend / total Amazon revenue (lower is better)", "percent", "lower_is_better", "gsheets", "amazon.tacos", "mtd",
-    15, "tm_gyorgy", [], 16, 15.2, 14.8),
-  k("amazon_buybox", "Amazon Buy Box", "% of time Carbinox owns its Buy Box", "percent", "higher_is_better", "gsheets", "amazon.buy_box_win", "mtd",
-    95, "tm_gyorgy", [], 97, 96, 96.5),
-  k("ttshop_rev", "TikTok Shop Revenue", "Monthly GMV on TikTok Shop", "currency", "higher_is_better", "gsheets", "tiktokshop.revenue", "mtd",
-    45000, "tm_gyorgy", [], 1200, 1400, 38000),
-  k("ttshop_creators", "Active Affiliate Creators", "Affiliates driving sales this month", "number", "higher_is_better", "gsheets", "tiktokshop.creators_active", "mtd",
-    20, "tm_gyorgy", [], 0, 19, 22),
-  k("walmart_rev", "Marketplace Revenue", "Walmart / Best Buy / eBay combined revenue", "currency", "higher_is_better", "gsheets", "marketplaces.revenue", "mtd",
-    75000, "tm_gyorgy", [], 2100, 2400, 64000),
-  k("walmart_odr", "Order Defect Rate", "Late/cancelled/return rate across marketplaces", "percent", "lower_is_better", "gsheets", "marketplaces.order_defect_rate", "mtd",
-    1, "tm_gyorgy", [], 0.8, 0.9, 0.95),
+  // ── TIKTOK MEDIA BUYER — Damian ───────────────────────────────────────
+  k("tiktok_roas", "TikTok Platform ROAS", "TikTok revenue ÷ TikTok spend.", "ratio", "higher_is_better", "triplewhale", "tiktok.roas", "mtd",
+    1.5, "tm_damian", "dep_advertising", ["tm_jose"], 1.3, 1.4, 1.45),
+  k("tiktok_cac", "TikTok CAC", "TikTok spend ÷ new customers attributed to TikTok.", "currency", "lower_is_better", "triplewhale", "tiktok.cac", "mtd",
+    70, "tm_damian", "dep_advertising", ["tm_jose"], 75, 72, 71),
+  k("tiktok_pacing", "TikTok Spend Pacing", "Actual TikTok spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "tiktok.spend_pacing", "mtd",
+    10, "tm_damian", "dep_advertising", ["tm_jose"], 5, 6, 7),
 
-  // ── LOGISTICS ──────────────────────────────────────────────────────
-  k("stockout", "Stockout Rate (Top 3 SKUs)", "% of days top-3 SKUs were out of stock", "percent", "lower_is_better", "gsheets", "supply.stockout_top3", "mtd",
-    0, "tm_thaylu", ["tm_jose"], 0, 0, 0.5),
-  k("inbound_defect", "Inbound Defect Rate", "Units arriving from manufacturer with defects", "percent", "lower_is_better", "gsheets", "supply.defect_inbound", "mtd",
-    2, "tm_thaylu", [], 1.6, 1.8, 1.9),
-  k("inventory_turn", "Inventory Turnover", "Times inventory sells & replaces per year (annualized)", "ratio", "higher_is_better", "gsheets", "supply.inventory_turnover", "mtd",
-    6, "tm_thaylu", [], 5.8, 5.9, 6.1),
-  k("ship_sla_heidi", "Ship-by-SLA (Heidi)", "Orders shipped within promised SLA", "percent", "higher_is_better", "shopify", "fulfillment.sla.heidi", "mtd",
-    98, "tm_heidi", ["tm_evelyn", "tm_thaylu"], 97, 98, 98.5),
-  k("ship_sla_miet", "Ship-by-SLA (Miet)", "Orders shipped within promised SLA", "percent", "higher_is_better", "shopify", "fulfillment.sla.miet", "mtd",
-    98, "tm_miet", ["tm_evelyn", "tm_thaylu"], 99, 99, 99.1),
-  k("ship_sla_jose_torres", "Ship-by-SLA (Jose)", "Orders shipped within promised SLA", "percent", "higher_is_better", "shopify", "fulfillment.sla.jose_torres", "mtd",
-    98, "tm_jose_torres", ["tm_evelyn", "tm_thaylu"], 95, 96, 96.2),
-  k("order_accuracy", "Order Accuracy Rate", "Correct items, quantities, and packaging", "percent", "higher_is_better", "gsheets", "fulfillment.order_accuracy", "mtd",
-    99.5, "tm_evelyn", ["tm_thaylu"], 99.2, 99.4, 99.5),
+  // ── APPLOVIN MEDIA BUYER — Damian ─────────────────────────────────────
+  k("applovin_roas", "AppLovin Platform ROAS", "AppLovin revenue ÷ AppLovin spend.", "ratio", "higher_is_better", "triplewhale", "applovin.roas", "mtd",
+    1.5, "tm_damian", "dep_advertising", ["tm_jose"], 1.3, 1.4, 1.45),
+  k("applovin_cac", "AppLovin CAC", "AppLovin spend ÷ new customers attributed.", "currency", "lower_is_better", "triplewhale", "applovin.cac", "mtd",
+    80, "tm_damian", "dep_advertising", ["tm_jose"], 85, 82, 81),
+  k("applovin_pacing", "AppLovin Spend Pacing", "Actual AppLovin spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "applovin.spend_pacing", "mtd",
+    10, "tm_damian", "dep_advertising", ["tm_jose"], 6, 7, 8),
 
-  // ── CUSTOMER SUCCESS ───────────────────────────────────────────────
-  k("frt_justine", "First Response Time (Justine)", "Time to first human response (email)", "duration_s", "lower_is_better", "zendesk", "cs.frt.justine", "7d",
-    14400, "tm_justine", ["tm_doralee"], 13200, 13800, 13400),
-  k("frt_juan", "First Response Time (Juan)", "Time to first human response (email)", "duration_s", "lower_is_better", "zendesk", "cs.frt.juan", "7d",
-    14400, "tm_juan", ["tm_doralee"], 18000, 16200, 15600),
-  k("frt_felipe", "First Response Time (Felipe)", "Time to first human response (email)", "duration_s", "lower_is_better", "zendesk", "cs.frt.felipe", "7d",
-    14400, "tm_felipe", ["tm_doralee"], 13200, 12800, 13500),
-  k("frt_anthony", "First Response Time (Anthony)", "Time to first human response (email)", "duration_s", "lower_is_better", "zendesk", "cs.frt.anthony", "7d",
-    14400, "tm_anthony", ["tm_doralee"], 13800, 13200, 13900),
-  k("csat", "Company CSAT", "Blended CSAT across all reps", "ratio", "higher_is_better", "zendesk", "cs.csat_blended", "mtd",
-    4.2, "tm_doralee", ["tm_jose"], 4.3, 4.25, 4.28),
+  // ── REDDIT MEDIA BUYER — Damian ───────────────────────────────────────
+  k("reddit_roas", "Reddit Platform ROAS", "Reddit revenue ÷ Reddit spend.", "ratio", "higher_is_better", "manual", "reddit.roas", "mtd",
+    2.0, "tm_damian", "dep_advertising", ["tm_jose"], 1.8, 1.9, 1.95),
+  k("reddit_cac", "Reddit CAC", "Reddit spend ÷ new customers attributed to Reddit.", "currency", "lower_is_better", "manual", "reddit.cac", "mtd",
+    75, "tm_damian", "dep_advertising", ["tm_jose"], 80, 77, 76),
+  k("reddit_pacing", "Reddit Spend Pacing", "Actual Reddit spend vs. forecasted (±10%).", "percent", "lower_is_better", "manual", "reddit.spend_pacing", "mtd",
+    10, "tm_damian", "dep_advertising", ["tm_jose"], 5, 6, 7),
 
-  // ── FINANCE ────────────────────────────────────────────────────────
-  k("net_margin", "Net Profit Margin", "Bottom-line profit after ALL expenses", "percent", "higher_is_better", "gsheets", "finance.net_margin", "mtd",
-    15, "tm_jaime", ["tm_jose"], 13, 14.2, 15.6),
-  k("mer", "MER", "Total revenue ÷ total marketing spend", "ratio", "higher_is_better", "gsheets", "finance.mer", "mtd",
-    3.0, "tm_jaime", ["tm_jose"], 2.8, 2.95, 3.08),
-  k("gross_margin", "Gross Margin", "Revenue minus COGS as % of revenue", "percent", "higher_is_better", "gsheets", "finance.gross_margin", "mtd",
-    60, "tm_jaime", ["tm_jose"], 61, 60.5, 61.2),
-  k("ccc", "Cash Conversion Cycle", "Days between paying inventory and getting paid (lower is better)", "duration_s", "lower_is_better", "gsheets", "finance.ccc_days_seconds", "mtd",
-    45 * 86400, "tm_jaime", ["tm_jose"], 43 * 86400, 44 * 86400, 42 * 86400),
-  k("budget_variance", "Budget Variance", "Actual spend vs. planned budget per department", "percent", "lower_is_better", "gsheets", "finance.budget_variance", "mtd",
-    5, "tm_gyorgy", ["tm_jaime"], 3.2, 4.1, 3.8),
+  // ── CREATIVE STRATEGISTS — Oli ───────────────────────────────────────
+  k("oli_winning_images", "% Winning Images", "Static creatives that beat control ÷ total tested.", "percent", "higher_is_better", "gsheets", "creative.oli.winning_images", "mtd",
+    15, "tm_oli", "dep_creative", ["tm_damian"], 13, 14, 14),
+  k("oli_winning_videos", "% Winning Videos", "Video creatives that beat control ÷ total tested.", "percent", "higher_is_better", "gsheets", "creative.oli.winning_videos", "mtd",
+    15, "tm_oli", "dep_creative", ["tm_damian"], 12, 13, 14),
+  k("oli_hook_rate", "Average Hook Rate", "Average 3-sec view rate across creatives.", "percent", "higher_is_better", "triplewhale", "creative.oli.hook_rate", "mtd",
+    35, "tm_oli", "dep_creative", ["tm_damian"], 31, 33, 34),
+  k("oli_ctr", "Average CTR", "Total clicks ÷ total impressions across creatives.", "percent", "higher_is_better", "triplewhale", "creative.oli.ctr", "mtd",
+    1, "tm_oli", "dep_creative", ["tm_damian"], 0.8, 0.9, 0.95),
+  k("oli_spend_concentration", "Spend Concentration", "Spend on their creatives ÷ total ad spend (~25% ±5%).", "percent", "higher_is_better", "gsheets", "creative.oli.spend_share", "mtd",
+    25, "tm_oli", "dep_creative", ["tm_damian"], 23, 24, 25),
 
-  // ── EXECUTIVE ──────────────────────────────────────────────────────
-  k("ea_action", "Action Item Follow-Through", "Leadership action items tracked & completed on time", "percent", "higher_is_better", "gsheets", "ea.action_item_follow_through", "mtd",
-    95, "tm_thaylu", ["tm_jose"], 94, 95, 96),
-  k("ea_response", "EA Response Time", "Avg response time during business hours", "duration_s", "lower_is_better", "gsheets", "ea.response_time_s", "7d",
-    3600, "tm_thaylu", ["tm_jose"], 3300, 3200, 3400),
+  // ── CREATIVE STRATEGISTS — Malu ───────────────────────────────────────
+  k("malu_winning_images", "% Winning Images", "Static creatives that beat control ÷ total tested.", "percent", "higher_is_better", "gsheets", "creative.malu.winning_images", "mtd",
+    15, "tm_malu", "dep_creative", ["tm_damian"], 13, 14, 14),
+  k("malu_winning_videos", "% Winning Videos", "Video creatives that beat control ÷ total tested.", "percent", "higher_is_better", "gsheets", "creative.malu.winning_videos", "mtd",
+    15, "tm_malu", "dep_creative", ["tm_damian"], 12, 13, 14),
+  k("malu_hook_rate", "Average Hook Rate", "Average 3-sec view rate across creatives.", "percent", "higher_is_better", "triplewhale", "creative.malu.hook_rate", "mtd",
+    35, "tm_malu", "dep_creative", ["tm_damian"], 31, 33, 34),
+  k("malu_ctr", "Average CTR", "Total clicks ÷ total impressions across creatives.", "percent", "higher_is_better", "triplewhale", "creative.malu.ctr", "mtd",
+    1, "tm_malu", "dep_creative", ["tm_damian"], 0.8, 0.9, 0.95),
+  k("malu_spend_concentration", "Spend Concentration", "Spend on their creatives ÷ total ad spend (~25% ±5%).", "percent", "higher_is_better", "gsheets", "creative.malu.spend_share", "mtd",
+    25, "tm_malu", "dep_creative", ["tm_damian"], 23, 24, 25),
 
-  // Company-level (CEO dashboard)
-  k("co_revenue", "Total Revenue", "Shopify + Amazon + Other Channels (MTD)", "currency", "higher_is_better", "gsheets", "company.total_revenue", "mtd",
-    1500000, "tm_jose", [], 47000, 49500, 1395000),
-  k("co_ltv_cac", "LTV : CAC", "Lifetime value divided by blended CAC", "ratio", "higher_is_better", "gsheets", "company.ltv_to_cac", "mtd",
-    3.0, "tm_jose", [], 2.9, 2.95, 3.1),
-  k("co_repeat", "Repeat Purchase Rate", "% of customers who buy more than once", "percent", "higher_is_better", "gsheets", "company.repeat_purchase_rate", "mtd",
-    15, "tm_jose", [], 14.2, 14.8, 15.3),
+  // ── CREATIVE STRATEGISTS — Maria Paula ────────────────────────────────
+  k("maria_winning_images", "% Winning Images", "Static creatives that beat control ÷ total tested.", "percent", "higher_is_better", "gsheets", "creative.maria.winning_images", "mtd",
+    15, "tm_maria", "dep_creative", ["tm_damian"], 13, 14, 14),
+  k("maria_winning_videos", "% Winning Videos", "Video creatives that beat control ÷ total tested.", "percent", "higher_is_better", "gsheets", "creative.maria.winning_videos", "mtd",
+    15, "tm_maria", "dep_creative", ["tm_damian"], 12, 13, 14),
+  k("maria_hook_rate", "Average Hook Rate", "Average 3-sec view rate across creatives.", "percent", "higher_is_better", "triplewhale", "creative.maria.hook_rate", "mtd",
+    35, "tm_maria", "dep_creative", ["tm_damian"], 31, 33, 34),
+  k("maria_ctr", "Average CTR", "Total clicks ÷ total impressions across creatives.", "percent", "higher_is_better", "triplewhale", "creative.maria.ctr", "mtd",
+    1, "tm_maria", "dep_creative", ["tm_damian"], 0.8, 0.9, 0.95),
+  k("maria_spend_concentration", "Spend Concentration", "Spend on their creatives ÷ total ad spend (~25% ±5%).", "percent", "higher_is_better", "gsheets", "creative.maria.spend_share", "mtd",
+    25, "tm_maria", "dep_creative", ["tm_damian"], 23, 24, 25),
+
+  // ── CREATIVE STRATEGISTS — Dante ──────────────────────────────────────
+  k("dante_winning_images", "% Winning Images", "Static creatives that beat control ÷ total tested.", "percent", "higher_is_better", "gsheets", "creative.dante.winning_images", "mtd",
+    15, "tm_dante", "dep_creative", ["tm_damian"], 13, 14, 14),
+  k("dante_winning_videos", "% Winning Videos", "Video creatives that beat control ÷ total tested.", "percent", "higher_is_better", "gsheets", "creative.dante.winning_videos", "mtd",
+    15, "tm_dante", "dep_creative", ["tm_damian"], 12, 13, 14),
+  k("dante_hook_rate", "Average Hook Rate", "Average 3-sec view rate across creatives.", "percent", "higher_is_better", "triplewhale", "creative.dante.hook_rate", "mtd",
+    35, "tm_dante", "dep_creative", ["tm_damian"], 31, 33, 34),
+  k("dante_ctr", "Average CTR", "Total clicks ÷ total impressions across creatives.", "percent", "higher_is_better", "triplewhale", "creative.dante.ctr", "mtd",
+    1, "tm_dante", "dep_creative", ["tm_damian"], 0.8, 0.9, 0.95),
+  k("dante_spend_concentration", "Spend Concentration", "Spend on their creatives ÷ total ad spend (~25% ±5%).", "percent", "higher_is_better", "gsheets", "creative.dante.spend_share", "mtd",
+    25, "tm_dante", "dep_creative", ["tm_damian"], 23, 24, 25),
+
+  // ── VIDEO EDITORS ─────────────────────────────────────────────────────
+  ...videoEditorKPIs("dante", "tm_dante"),
+  ...videoEditorKPIs("pedro", "tm_pedro"),
+  ...videoEditorKPIs("sami", "tm_sami"),
+  ...videoEditorKPIs("paul", "tm_paul"),
+
+  // ── GRAPHIC DESIGNER — Winder ─────────────────────────────────────────
+  k("winder_on_time", "On-Time Delivery Rate", "Designs delivered by deadline ÷ total assigned.", "percent", "higher_is_better", "gsheets", "design.winder.on_time", "mtd",
+    95, "tm_winder", "dep_creative", ["tm_damian"], 92, 94, 95),
+  k("winder_revision", "Revision Rate", "Designs requiring rework after first delivery ÷ total delivered.", "percent", "lower_is_better", "gsheets", "design.winder.revision_rate", "mtd",
+    20, "tm_winder", "dep_creative", ["tm_damian"], 18, 17, 16),
+  k("winder_ctr", "Average CTR on Designs", "Clicks ÷ impressions across his designs.", "percent", "higher_is_better", "triplewhale", "design.winder.ctr", "mtd",
+    1, "tm_winder", "dep_creative", ["tm_damian"], 0.8, 0.9, 0.95),
+
+  // ── CONTENT MANAGER — Jesus de Windt ─────────────────────────────────
+  k("jdw_youtube_reviews", "YouTube Reviews Sourced", "New YouTube creator reviews uploaded to library.", "number", "higher_is_better", "gsheets", "content.youtube_reviews", "mtd",
+    10, "tm_jesus_dw", "dep_content", ["tm_damian"], 0, 2, 3),
+  k("jdw_ai_pieces", "AI Pieces Uploaded as Ads", "AI-generated creative pieces uploaded to ad library + tested.", "number", "higher_is_better", "gsheets", "content.ai_pieces", "mtd",
+    64, "tm_jesus_dw", "dep_content", ["tm_damian"], 0, 12, 18),
+
+  // ── TIKTOK SHOP SPECIALIST — Jesus / Maria ───────────────────────────
+  k("tts_affiliates_signed", "New Affiliate Retainer Contracts", "New affiliate creators signed to a retainer per month.", "number", "higher_is_better", "gsheets", "tiktokshop.affiliates_signed", "mtd",
+    25, "tm_jesus_dw", "dep_content", ["tm_maria", "tm_damian"], 0, 4, 6),
+  k("tts_videos_posted", "Videos Posted by Affiliates", "Total TikTok videos posted by Carbinox affiliates.", "number", "higher_is_better", "gsheets", "tiktokshop.affiliate_videos", "mtd",
+    500, "tm_jesus_dw", "dep_content", ["tm_maria", "tm_damian"], 0, 80, 120),
+  k("tts_repurposed_winning", "Winning Rate on Meta (Repurposed)", "TikTok affiliate videos repurposed to Meta that beat control ÷ total tested.", "percent", "higher_is_better", "gsheets", "tiktokshop.repurposed_winning_rate", "mtd",
+    15, "tm_jesus_dw", "dep_content", ["tm_maria", "tm_damian"], 12, 13, 14),
+
+  // ── EMAIL & SMS — Samra ───────────────────────────────────────────────
+  k("retention_revenue_share", "Retention Channel Revenue %", "Email + SMS revenue ÷ total store revenue.", "percent", "higher_is_better", "klaviyo", "retention.revenue_share", "mtd",
+    25, "tm_samra", "dep_retention", ["tm_jose"], 22, 23, 24),
+  k("flow_campaign_split", "Flow vs Campaign Revenue Split", "Flow revenue ÷ total email+SMS revenue (target 60% flow).", "percent", "higher_is_better", "klaviyo", "retention.flow_share", "mtd",
+    60, "tm_samra", "dep_retention", ["tm_jose"], 55, 58, 59),
+  k("list_growth", "List Growth Rate", "(New subs − unsubs − bounces) ÷ list size at start of month.", "percent", "higher_is_better", "klaviyo", "retention.list_growth", "mtd",
+    5, "tm_samra", "dep_retention", ["tm_jose"], 3, 4, 4.5),
+  k("email_open_rate", "Email Open Rate", "Opens ÷ delivered, averaged across all sends.", "percent", "higher_is_better", "klaviyo", "retention.open_rate", "mtd",
+    50, "tm_samra", "dep_retention", ["tm_jose"], 47, 48, 49),
+  k("retention_ctr", "Email/SMS CTR", "Clicks ÷ delivered, averaged across all sends.", "percent", "higher_is_better", "klaviyo", "retention.ctr", "mtd",
+    1, "tm_samra", "dep_retention", ["tm_jose"], 0.85, 0.9, 0.95),
+  k("unsubscribe_rate", "Unsubscribe Rate", "Unsubscribes ÷ delivered, averaged.", "percent", "lower_is_better", "klaviyo", "retention.unsub_rate", "mtd",
+    0.3, "tm_samra", "dep_retention", ["tm_jose"], 0.25, 0.27, 0.28),
+
+  // ── HEAD OF CX SUCCESS — Doralee ──────────────────────────────────────
+  k("cx_csat", "CSAT", "Average post-ticket satisfaction rating.", "percent", "higher_is_better", "zendesk", "cx.csat", "mtd",
+    90, "tm_doralee", "dep_cs", ["tm_thaylu", "tm_jose"], 87, 88, 89),
+  k("cx_first_response", "Average First Response Time", "Time from ticket creation to first agent reply.", "duration_s", "lower_is_better", "zendesk", "cx.first_response_s", "mtd",
+    14400, "tm_doralee", "dep_cs", ["tm_thaylu"], 12000, 13200, 13800),
+  k("cx_tickets_per_100", "Tickets per 100 Orders", "(Total tickets ÷ total orders) × 100.", "ratio", "lower_is_better", "zendesk", "cx.tickets_per_100", "mtd",
+    25, "tm_doralee", "dep_cs", ["tm_thaylu"], 22, 23, 24),
+  k("cx_save_rate", "Save Rate", "Refund/return requests retained with offer ÷ total received.", "percent", "higher_is_better", "zendesk", "cx.save_rate", "mtd",
+    30, "tm_doralee", "dep_cs", ["tm_thaylu"], 27, 28, 29),
+  k("cx_chargeback", "Chargeback Rate", "Chargebacks ÷ total orders.", "percent", "lower_is_better", "shopify", "cx.chargeback_rate", "mtd",
+    0.5, "tm_doralee", "dep_cs", ["tm_thaylu"], 0.4, 0.45, 0.48),
+
+  // ── CX REPS — Anthony / Justine / Juan / Felipe ──────────────────────
+  ...cxRepKPIs("anthony", "tm_anthony"),
+  ...cxRepKPIs("justine", "tm_justine"),
+  ...cxRepKPIs("juan", "tm_juan"),
+  ...cxRepKPIs("felipe", "tm_felipe"),
+
+  // ── HEAD OF TEAM SUCCESS — Thaylu ─────────────────────────────────────
+  k("team_activities_completion", "% Completion of Monthly Activities", "Team members who completed all monthly activities ÷ total.", "percent", "higher_is_better", "gsheets", "team.activities_completion", "mtd",
+    95, "tm_thaylu", "dep_team_success", ["tm_jose"], 90, 92, 93),
+  k("team_slack_engagement", "% Engagement per Slack Post", "Average % of team that reacts/replies/views per leadership Slack post.", "percent", "higher_is_better", "gsheets", "team.slack_engagement", "mtd",
+    50, "tm_thaylu", "dep_team_success", ["tm_jose"], 45, 47, 48),
+  k("team_retention", "Employee Retention Rate", "Team retained at month-end ÷ at month-start.", "percent", "higher_is_better", "gsheets", "team.retention", "mtd",
+    100, "tm_thaylu", "dep_team_success", ["tm_jose"], 100, 100, 100),
+
+  // ── HEAD OF WEBSITE — Damian ──────────────────────────────────────────
+  k("site_cvr", "Conversion Rate (CVR)", "Orders ÷ sessions (mobile + desktop).", "percent", "higher_is_better", "shopify", "site.cvr", "mtd",
+    1.5, "tm_damian", "dep_website", ["tm_jose"], 1.3, 1.4, 1.45),
+  k("site_aov", "Average Order Value (AOV)", "Total revenue ÷ total orders.", "currency", "higher_is_better", "shopify", "orders.aov", "mtd",
+    130, "tm_damian", "dep_website", ["tm_jose"], 125, 128, 129),
+  k("site_rpv", "Revenue per Visitor (RPV)", "Total revenue ÷ total sessions.", "currency", "higher_is_better", "shopify", "site.rpv", "mtd",
+    2.5, "tm_damian", "dep_website", ["tm_jose"], 2.2, 2.3, 2.4),
+  k("site_page_speed", "Page Speed", "PageSpeed Insights mobile score.", "percent", "higher_is_better", "manual", "site.page_speed", "mtd",
+    85, "tm_damian", "dep_website", ["tm_jose"], 80, 82, 83),
+  k("site_ab_test_win", "A/B Test Win Rate", "Tests beating control with stat sig ÷ total tests run.", "percent", "higher_is_better", "gsheets", "site.ab_test_win", "mtd",
+    60, "tm_damian", "dep_website", ["tm_jose"], 55, 57, 58),
+
+  // ── HEAD OF MARKETPLACES — Gyorgy ─────────────────────────────────────
+  k("mp_revenue_growth", "Marketplace Revenue Growth", "Current month total marketplace revenue vs same month last year.", "percent", "higher_is_better", "gsheets", "marketplaces.yoy_growth", "mtd",
+    30, "tm_gyorgy", "dep_marketplaces", ["tm_jose"], 25, 27, 28),
+  k("mp_amazon_roas", "Amazon ROAS", "Amazon ad revenue ÷ Amazon ad spend.", "ratio", "higher_is_better", "gsheets", "marketplaces.amazon_roas", "mtd",
+    4.0, "tm_gyorgy", "dep_marketplaces", ["tm_jose"], 3.6, 3.8, 3.9),
+  k("mp_cvr", "Conversion Rate by Marketplace", "Orders ÷ visits per marketplace, averaged.", "percent", "higher_is_better", "gsheets", "marketplaces.cvr", "mtd",
+    10, "tm_gyorgy", "dep_marketplaces", ["tm_jose"], 8, 9, 9.5),
+  k("mp_margin", "Profit Margin per Marketplace", "Net margin per marketplace after fees, ads, returns, shipping.", "percent", "higher_is_better", "gsheets", "marketplaces.margin", "mtd",
+    25, "tm_gyorgy", "dep_marketplaces", ["tm_jose"], 22, 23, 24),
+
+  // ── CFO — Jaime ───────────────────────────────────────────────────────
+  k("fin_gross_margin", "Gross Profit Margin %", "(Revenue − COGS) ÷ Revenue.", "percent", "higher_is_better", "gsheets", "finance.gross_margin", "mtd",
+    60, "tm_jaime", "dep_finance", ["tm_jose"], 57, 58, 59),
+  k("fin_net_margin", "Net Profit Margin %", "Net profit ÷ Revenue.", "percent", "higher_is_better", "gsheets", "finance.net_margin", "mtd",
+    15, "tm_jaime", "dep_finance", ["tm_jose"], 12, 13, 14),
+  k("fin_cash_runway", "Cash Runway (months)", "Cash on hand ÷ average monthly burn rate.", "number", "higher_is_better", "gsheets", "finance.cash_runway_months", "mtd",
+    6, "tm_jaime", "dep_finance", ["tm_jose"], 6, 6, 6),
+  k("fin_inventory_turn", "Inventory Turnover (annualized)", "COGS ÷ average inventory value.", "ratio", "higher_is_better", "gsheets", "finance.inventory_turnover", "mtd",
+    4, "tm_jaime", "dep_finance", ["tm_jose"], 3.6, 3.8, 3.9),
+  k("fin_ebitda", "EBITDA Margin", "EBITDA ÷ Revenue.", "percent", "higher_is_better", "gsheets", "finance.ebitda_margin", "mtd",
+    10, "tm_jaime", "dep_finance", ["tm_jose"], 8, 9, 9.5),
+
+  // ── HEAD OF LOGISTICS — Evelyn ────────────────────────────────────────
+  k("log_order_accuracy", "Order Accuracy Rate", "Orders shipped correctly ÷ total shipped × 100.", "percent", "higher_is_better", "gsheets", "logistics.order_accuracy", "mtd",
+    95, "tm_evelyn", "dep_logistics", ["tm_thaylu"], 93, 94, 94.5),
+  k("log_on_time_ship", "On-Time Shipping Rate", "Orders shipped within SLA ÷ total shipped × 100.", "percent", "higher_is_better", "shopify", "logistics.on_time_shipping", "mtd",
+    95, "tm_evelyn", "dep_logistics", ["tm_thaylu"], 93, 94, 95),
+  k("log_inventory_count", "Inventory Count Accuracy", "Physical count vs system count via cycle counts.", "percent", "higher_is_better", "gsheets", "logistics.inventory_accuracy", "mtd",
+    95, "tm_evelyn", "dep_logistics", ["tm_thaylu"], 93, 94, 95),
+
+  // ── HEAD OF SUPPLY CHAIN — Thaylu ─────────────────────────────────────
+  k("sc_in_stock", "In-Stock Rate", "% of SKUs in stock across all channels.", "percent", "higher_is_better", "gsheets", "supply.in_stock", "mtd",
+    95, "tm_thaylu", "dep_supply_chain", ["tm_jose"], 93, 94, 94.5),
+  k("sc_po_accuracy", "PO Tracking Accuracy", "POs correctly registered in Slack/Sortly/Shopify ÷ total POs.", "percent", "higher_is_better", "gsheets", "supply.po_accuracy", "mtd",
+    100, "tm_thaylu", "dep_supply_chain", ["tm_jose"], 98, 99, 100),
+  k("sc_days_inventory", "Days of Inventory on Hand", "Current inventory ÷ avg daily sales rate (target 60-90 days).", "number", "higher_is_better", "gsheets", "supply.days_inventory", "mtd",
+    75, "tm_thaylu", "dep_supply_chain", ["tm_jose"], 72, 74, 75),
 ];
+
+function videoEditorKPIs(key: string, ownerId: string): KpiSpec[] {
+  return [
+    k(`${key}_on_time`, "On-Time Delivery Rate", "Videos delivered by deadline ÷ total videos assigned.", "percent", "higher_is_better", "gsheets", `video.${key}.on_time`, "mtd",
+      95, ownerId, "dep_creative", ["tm_damian"], 92, 94, 94.5),
+    k(`${key}_revision`, "Revision Rate", "Videos requiring rework after first delivery ÷ total delivered.", "percent", "lower_is_better", "gsheets", `video.${key}.revision_rate`, "mtd",
+      20, ownerId, "dep_creative", ["tm_damian"], 18, 17, 16),
+    k(`${key}_hold_rate`, "Hold Rate", "% of viewers still watching at the defined hold-rate timestamp.", "percent", "higher_is_better", "triplewhale", `video.${key}.hold_rate`, "mtd",
+      5, ownerId, "dep_creative", ["tm_damian"], 4, 4.5, 4.8),
+  ];
+}
+
+function cxRepKPIs(key: string, ownerId: string): KpiSpec[] {
+  return [
+    k(`${key}_tickets_per_day`, "Tickets Resolved per Day", "Tickets closed per shift, averaged across the month.", "number", "higher_is_better", "zendesk", `cx.${key}.tickets_per_day`, "mtd",
+      50, ownerId, "dep_cs", ["tm_doralee"], 45, 47, 48),
+    k(`${key}_response_time`, "Average Response Time", "Average time from ticket assignment to first reply.", "duration_s", "lower_is_better", "zendesk", `cx.${key}.response_time_s`, "mtd",
+      14400, ownerId, "dep_cs", ["tm_doralee"], 12000, 13000, 13500),
+    k(`${key}_csat`, "CSAT (per rep)", "Average rating on tickets they personally handled.", "percent", "higher_is_better", "zendesk", `cx.${key}.csat`, "mtd",
+      90, ownerId, "dep_cs", ["tm_doralee"], 87, 88, 89),
+    k(`${key}_save_rate`, "Save Rate (per rep)", "Refund/return requests retained ÷ total received.", "percent", "higher_is_better", "zendesk", `cx.${key}.save_rate`, "mtd",
+      30, ownerId, "dep_cs", ["tm_doralee"], 27, 28, 29),
+    k(`${key}_first_touch`, "First-Touch Resolution Rate", "Tickets solved in one reply ÷ total handled.", "percent", "higher_is_better", "zendesk", `cx.${key}.first_touch`, "mtd",
+      70, ownerId, "dep_cs", ["tm_doralee"], 65, 67, 68),
+  ];
+}
 
 function k(
   idSuffix: string,
@@ -261,6 +362,7 @@ function k(
   window: KPI["window"],
   target: number,
   ownerId: string,
+  targetDepartmentId: string,
   watcherIds: string[] | undefined,
   today: number,
   last7: number,
@@ -277,6 +379,7 @@ function k(
     window,
     target,
     ownerId,
+    targetDepartmentId,
     watcherIds,
     today,
     last7,
@@ -284,34 +387,13 @@ function k(
   };
 }
 
-const kpis: KPI[] = kpiSpecs.map(({ target, ownerId, watcherIds, today, last7, mtd, ...kpi }) => kpi);
-
-function deptForMetricKey(key: string): string | undefined {
-  const k = key.toLowerCase();
-  if (k.startsWith("meta.") || k.startsWith("google.") || k.startsWith("tiktok.") ||
-      k.startsWith("snap.") || k.startsWith("applovin.") || k.startsWith("blended.")) {
-    return "dep_advertising";
-  }
-  if (k.startsWith("creative.") || k.startsWith("content.")) return "dep_creative";
-  if (k.startsWith("email.") || k.startsWith("sms.") || k.startsWith("social.")) return "dep_organic";
-  if (k.startsWith("lp.")) return "dep_lp";
-  if (k.startsWith("site.") || k.startsWith("cro.") || k.startsWith("orders.") || k.startsWith("checkout.")) return "dep_cro";
-  if (k.startsWith("amazon.")) return "dep_amazon";
-  if (k.startsWith("tiktokshop.")) return "dep_ttshop";
-  if (k.startsWith("marketplaces.")) return "dep_marketplace";
-  if (k.startsWith("supply.")) return "dep_supply";
-  if (k.startsWith("fulfillment.")) return "dep_fulfillment";
-  if (k.startsWith("cs.")) return "dep_cs";
-  if (k.startsWith("finance.")) return "dep_finance";
-  if (k.startsWith("ea.") || k.startsWith("company.")) return "dep_exec";
-  return undefined;
-}
+const kpis: KPI[] = kpiSpecs.map(({ target, ownerId, watcherIds, today, last7, mtd, targetDepartmentId, ...kpi }) => kpi);
 
 const targets: Target[] = kpiSpecs.map((s) => ({
   id: `t_${s.id.replace("kpi_", "")}`,
   kpiId: s.id,
   ownerId: s.ownerId,
-  departmentId: deptForMetricKey(s.metricKey),
+  departmentId: s.targetDepartmentId,
   watcherIds: s.watcherIds?.length ? s.watcherIds : undefined,
   target: s.target,
   period: "monthly",
@@ -329,7 +411,6 @@ const progress = Object.fromEntries(
         last7: s.last7,
         mtd: s.mtd,
         updatedAt: new Date().toISOString(),
-        // 400 days of samples so 90/180/365-day views have real data to chew on.
         samples: buildSamples(s.last7, 400, s.unit),
       },
     ];
@@ -343,6 +424,7 @@ export const seedState: AppState = {
   kpis,
   targets,
   progress,
+  submissions: [],
   integrations: [
     { provider: "shopify", label: "Shopify", connected: false, envVarsExpected: ["SHOPIFY_SHOP", "SHOPIFY_ADMIN_TOKEN"], lastSyncStatus: "never" },
     { provider: "triplewhale", label: "Triple Whale", connected: false, envVarsExpected: ["TRIPLEWHALE_API_KEY", "TRIPLEWHALE_SHOP_ID"], lastSyncStatus: "never" },
