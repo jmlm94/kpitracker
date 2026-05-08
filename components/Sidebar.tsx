@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,6 +11,8 @@ import {
   ClipboardCheck,
   PenLine,
   Settings as SettingsIcon,
+  Menu,
+  X,
 } from "lucide-react";
 import { Wordmark } from "./Logo";
 import { cx } from "@/lib/format";
@@ -23,16 +26,12 @@ const nav = [
   { href: "/settings", label: "Settings", icon: SettingsIcon, code: "06" },
 ];
 
-const HIGHLIGHT_NAV = {
-  href: "/fill",
-  label: "Fill KPIs Here",
-  icon: PenLine,
-};
-
 export function Sidebar() {
   const pathname = usePathname();
-  return (
-    <aside className="hidden w-[248px] shrink-0 border-r border-white/10 bg-jet-950 px-4 pb-6 pt-5 lg:flex lg:flex-col">
+  const [open, setOpen] = useState(false);
+
+  const content = (
+    <>
       <div className="px-1">
         <Wordmark />
       </div>
@@ -50,6 +49,7 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={() => setOpen(false)}
               className={cx(
                 "group relative flex items-center gap-3 border-l-2 px-3 py-2.5 text-sm transition",
                 active
@@ -80,28 +80,65 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Highlighted "Fill KPIs Here" — for team members to log their numbers */}
-      {(() => {
-        const Icon = HIGHLIGHT_NAV.icon;
-        const active = pathname === HIGHLIGHT_NAV.href || pathname.startsWith(HIGHLIGHT_NAV.href + "/");
-        return (
-          <Link
-            href={HIGHLIGHT_NAV.href}
-            className={cx(
-              "mt-6 flex items-center gap-3 border bg-carbinox text-jet-950 px-3 py-2.5 text-sm font-heading font-semibold uppercase tracking-brand transition hover:bg-carbinox-light",
-              active ? "border-carbinox-dark ring-2 ring-carbinox/40" : "border-carbinox-dark",
-            )}
-          >
-            <Icon size={15} />
-            <span>{HIGHLIGHT_NAV.label}</span>
-            <span className="ml-auto text-[10px] font-numeric">→</span>
-          </Link>
-        );
-      })()}
+      {/* Highlighted "Fill KPIs Here" */}
+      <Link
+        href="/fill"
+        onClick={() => setOpen(false)}
+        className={cx(
+          "mt-6 flex items-center gap-3 border bg-carbinox text-jet-950 px-3 py-2.5 text-sm font-heading font-semibold uppercase tracking-brand transition hover:bg-carbinox-light",
+          pathname === "/fill" ? "ring-2 ring-carbinox/40" : "",
+        )}
+      >
+        <PenLine size={15} />
+        <span>Fill KPIs Here</span>
+        <span className="ml-auto text-[10px] font-numeric">→</span>
+      </Link>
 
       <div className="mt-auto pt-8 font-heading text-[10px] uppercase tracking-brand text-white/30">
-        [ Carbinox Co. ] <span className="text-white/50">Build your outdoor artillery</span>
+        [ Carbinox Co. ] <span className="text-white/50">Built tough. Run tight.</span>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed left-3 top-3 z-50 border border-white/10 bg-jet-950 p-2 text-white lg:hidden"
+        aria-label="Open menu"
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* Mobile overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      {/* Mobile slide-out */}
+      <aside
+        className={cx(
+          "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-white/10 bg-jet-950 px-4 pb-6 pt-5 transition-transform duration-200 lg:hidden",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <button
+          onClick={() => setOpen(false)}
+          className="absolute right-3 top-3 text-white/60 hover:text-white"
+        >
+          <X size={18} />
+        </button>
+        {content}
+      </aside>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden w-[248px] shrink-0 border-r border-white/10 bg-jet-950 px-4 pb-6 pt-5 lg:flex lg:flex-col">
+        {content}
+      </aside>
+    </>
   );
 }

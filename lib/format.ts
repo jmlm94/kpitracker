@@ -46,10 +46,12 @@ export function formatValueFull(value: number, unit: Unit): string {
 export function progressRatio(kpi: KPI, target: Target, actual: number): number {
   if (target.target <= 0) return 0;
   if (kpi.direction === "higher_is_better") {
+    if (actual <= 0) return 0;
     return actual / target.target;
   }
   // lower_is_better: invert so that "at or below target" yields >= 1
-  if (actual <= 0) return 1;
+  // 0 means "not reported" — treat as no data, not as a perfect score
+  if (actual <= 0) return 0;
   return target.target / actual;
 }
 
@@ -72,6 +74,19 @@ export function statusLabel(s: Status): string {
       return "At risk";
     case "off_track":
       return "Off track";
+  }
+}
+
+export function statusIcon(s: Status): string {
+  switch (s) {
+    case "ahead":
+      return "✅";
+    case "on_track":
+      return "✅";
+    case "at_risk":
+      return "⚠️";
+    case "off_track":
+      return "❌";
   }
 }
 

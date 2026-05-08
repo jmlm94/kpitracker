@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, useRef } from "react";
-import { ArrowLeft, Camera } from "lucide-react";
+import { ArrowLeft, Camera, ChevronDown, ChevronRight } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { KPICard } from "@/components/KPICard";
 import { Avatar } from "@/components/Avatar";
@@ -255,34 +255,64 @@ export default function TeamMemberPage() {
       </section>
 
       {watching.length > 0 && (
-        <section className="mt-8">
-          <h2 className="section-title">Also watching</h2>
-          <p className="text-sm text-white/50">
-            KPIs that roll up into {member.name.split(" ")[0]}'s responsibility.
-          </p>
-          <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-            {watching.map((t) => {
-              const kpi = state.kpis.find((k) => k.id === t.kpiId);
-              const owner = state.team.find((m) => m.id === t.ownerId);
-              const ownerDept = state.departments.find(
-                (d) => d.id === owner?.departmentId,
-              );
-              if (!kpi) return null;
-              return (
-                <KPICard
-                  key={t.id}
-                  kpi={kpi}
-                  target={t}
-                  progress={state.progress[t.id]}
-                  owner={owner}
-                  deptColor={ownerDept?.color}
-                  timeframe={timeframe}
-                />
-              );
-            })}
-          </div>
-        </section>
+        <WatchingSection watching={watching} state={state} timeframe={timeframe} memberName={member.name} />
       )}
     </div>
+  );
+}
+
+function WatchingSection({
+  watching,
+  state,
+  timeframe,
+  memberName,
+}: {
+  watching: import("@/lib/types").Target[];
+  state: import("@/lib/types").AppState;
+  timeframe: import("@/lib/timeframe").Timeframe;
+  memberName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="mt-8">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-2 text-left"
+      >
+        {open ? (
+          <ChevronDown size={14} className="text-white/50" />
+        ) : (
+          <ChevronRight size={14} className="text-white/50" />
+        )}
+        <h2 className="section-title">Also watching</h2>
+        <span className="font-numeric text-[12px] text-white/45">({watching.length})</span>
+      </button>
+      <p className="text-sm text-white/50">
+        KPIs that roll up into {memberName.split(" ")[0]}'s responsibility. {!open && "Click to expand."}
+      </p>
+      {open && (
+        <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {watching.map((t) => {
+            const kpi = state.kpis.find((k) => k.id === t.kpiId);
+            const owner = state.team.find((m) => m.id === t.ownerId);
+            const ownerDept = state.departments.find(
+              (d) => d.id === owner?.departmentId,
+            );
+            if (!kpi) return null;
+            return (
+              <KPICard
+                key={t.id}
+                kpi={kpi}
+                target={t}
+                progress={state.progress[t.id]}
+                owner={owner}
+                deptColor={ownerDept?.color}
+                timeframe={timeframe}
+              />
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

@@ -103,6 +103,18 @@ type KpiSpec = KPI & {
 };
 
 const kpiSpecs: KpiSpec[] = [
+  // ── CEO — Jose Lepage ──────────────────────────────────────────────────
+  k("ceo_revenue", "Company Revenue", "Total revenue across all channels (Shopify + Amazon + Others).", "currency", "higher_is_better", "shopify", "company.revenue", "mtd",
+    1500000, "tm_jose", "dep_exec", [], 0, 0, 0),
+  k("ceo_ebitda", "EBITDA Margin", "EBITDA ÷ Revenue.", "percent", "higher_is_better", "gsheets", "company.ebitda_margin", "mtd",
+    10, "tm_jose", "dep_exec", [], 0, 0, 0),
+  k("ceo_net_margin", "Net Profit Margin", "Net profit ÷ Revenue.", "percent", "higher_is_better", "gsheets", "company.net_margin", "mtd",
+    15, "tm_jose", "dep_exec", [], 0, 0, 0),
+  k("ceo_blended_roas", "Blended ROAS", "Total revenue ÷ total ad spend across all platforms.", "ratio", "higher_is_better", "triplewhale", "company.blended_roas", "mtd",
+    2.28, "tm_jose", "dep_exec", [], 0, 0, 0),
+  k("ceo_kpis_on_track", "% KPIs On Track", "Company-wide percentage of KPIs at or above target.", "percent", "higher_is_better", "manual", "company.kpis_on_track", "mtd",
+    80, "tm_jose", "dep_exec", [], 0, 0, 0),
+
   // ── HEAD OF ADVERTISING — Damian ──────────────────────────────────────
   k("blended_roas", "Blended ROAS", "Total revenue ÷ total ad spend across all platforms.", "ratio", "higher_is_better", "triplewhale", "blended.roas", "mtd",
     2.28, "tm_damian", "dep_advertising", ["tm_jose"], 2.1, 2.2, 2.25),
@@ -122,6 +134,20 @@ const kpiSpecs: KpiSpec[] = [
     65, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 70, 67, 66),
   k("meta_pacing", "Meta Spend Pacing", "Actual Meta spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "meta.spend_pacing", "mtd",
     10, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 6, 7, 8),
+
+  // ── META/SNAP MEDIA BUYER — Kristaps (same targets, separate ownership) ──
+  k("kristaps_meta_roas", "Meta Platform ROAS", "Meta revenue ÷ Meta spend.", "ratio", "higher_is_better", "triplewhale", "meta.roas", "mtd",
+    1.66, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
+  k("kristaps_meta_cac", "Meta CAC", "Meta spend ÷ new customers attributed to Meta.", "currency", "lower_is_better", "triplewhale", "meta.cac", "mtd",
+    65, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
+  k("kristaps_meta_pacing", "Meta Spend Pacing", "Actual Meta spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "meta.spend_pacing", "mtd",
+    10, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
+  k("kristaps_snap_roas", "Snap Platform ROAS", "Snap revenue ÷ Snap spend.", "ratio", "higher_is_better", "triplewhale", "snap.roas", "mtd",
+    1.80, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
+  k("kristaps_snap_cac", "Snap CAC", "Snap spend ÷ new customers attributed to Snap.", "currency", "lower_is_better", "triplewhale", "snap.cac", "mtd",
+    75, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
+  k("kristaps_snap_pacing", "Snap Spend Pacing", "Actual Snap spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "snap.spend_pacing", "mtd",
+    10, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
 
   // ── GOOGLE MEDIA BUYER — Ivana ────────────────────────────────────────
   k("google_roas", "Google Platform ROAS", "Google revenue ÷ Google spend.", "ratio", "higher_is_better", "triplewhale", "google.roas", "mtd",

@@ -64,6 +64,8 @@ export type TeamMember = {
   /** @deprecated kept only for migration; use managerIds */
   managerId?: string;
   avatarInitials?: string;
+  /** Simple 4-digit PIN for self-service auth on /fill */
+  pin?: string;
   /** URL for profile picture (external URL or base64 data URI) */
   avatarUrl?: string;
 };

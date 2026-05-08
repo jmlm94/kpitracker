@@ -72,6 +72,32 @@ export default function FillPage() {
   if (!ready) return null;
 
   const activeMember = state.team.find((m) => m.id === activeId);
+  const [pinRequired, setPinRequired] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState(false);
+
+  function handlePick(id: string) {
+    const person = state.team.find((m) => m.id === id);
+    if (person?.pin) {
+      setPendingId(id);
+      setPinRequired(true);
+      setPinInput("");
+      setPinError(false);
+    } else {
+      logIn(id);
+    }
+  }
+  function verifyPin() {
+    const person = state.team.find((m) => m.id === pendingId);
+    if (person && pinInput === person.pin) {
+      logIn(person.id);
+      setPinRequired(false);
+      setPendingId(null);
+    } else {
+      setPinError(true);
+    }
+  }
 
   return (
     <div>
@@ -83,11 +109,42 @@ export default function FillPage() {
         immediately.
       </p>
 
-      {!activeMember ? (
-        <NamePicker team={state.team} departments={state.departments} onPick={logIn} />
-      ) : (
-        <FillForm member={activeMember} onLogOut={logOut} />
+      {pinRequired && (
+        <div className="card crosshair mt-6 border-carbinox/40 bg-carbinox/[0.05] p-6">
+          <div className="bracket text-carbinox">Enter your PIN</div>
+          <p className="mt-2 text-sm text-white/60">
+            {state.team.find((m) => m.id === pendingId)?.name} has a PIN set. Enter it to continue.
+          </p>
+          <div className="mt-4 flex items-center gap-3">
+            <input
+              type="password"
+              maxLength={6}
+              value={pinInput}
+              onChange={(e) => { setPinInput(e.target.value); setPinError(false); }}
+              onKeyDown={(e) => e.key === "Enter" && verifyPin()}
+              placeholder="PIN"
+              className="input w-32 text-center font-numeric text-lg tracking-widest"
+              autoFocus
+            />
+            <button onClick={verifyPin} className="btn-primary">Verify</button>
+            <button
+              onClick={() => { setPinRequired(false); setPendingId(null); }}
+              className="btn-ghost"
+            >
+              Cancel
+            </button>
+          </div>
+          {pinError && (
+            <div className="mt-2 text-sm text-bad">Wrong PIN. Try again.</div>
+          )}
+        </div>
       )}
+
+      {!activeMember && !pinRequired ? (
+        <NamePicker team={state.team} departments={state.departments} onPick={handlePick} />
+      ) : activeMember ? (
+        <FillForm member={activeMember} onLogOut={logOut} />
+      ) : null}
     </div>
   );
 }
@@ -206,18 +263,41 @@ function FillForm({
     return out;
   }, [targets, existing]);
 
+  const DRAFT_KEY = `carbinox-kpi-draft:${member.id}:${periodKey}`;
   const [draft, setDraft] = useState<Record<string, number>>(initial);
   const [notes, setNotes] = useState(existing?.notes || "");
 
   // Re-seed draft when period or existing changes
   useEffect(() => {
+    // Load saved draft from localStorage if it exists
+    try {
+      const saved = window.localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.values) setDraft(parsed.values);
+        if (parsed.notes) setNotes(parsed.notes);
+        return;
+      }
+    } catch {}
     setDraft(initial);
     setNotes(existing?.notes || "");
-  }, [initial, existing?.notes]);
+  }, [DRAFT_KEY, initial, existing?.notes]);
+
+  // Auto-save draft every 5 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      try {
+        window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ values: draft, notes }));
+      } catch {}
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [DRAFT_KEY, draft, notes]);
 
   const dirty =
     JSON.stringify(draft) !== JSON.stringify(initial) ||
     notes !== (existing?.notes || "");
+  const filledCount = Object.values(draft).filter((v) => v !== 0 && v !== null).length;
+  const totalKpis = targets.length;
 
   // Group KPIs by department
   const targetsByDept = useMemo(() => {
@@ -246,6 +326,8 @@ function FillForm({
       notes: notes.trim() || undefined,
     };
     upsertSubmission(sub);
+    // Clear the draft since it's been submitted
+    try { window.localStorage.removeItem(DRAFT_KEY); } catch {}
     setFlash(true);
     setTimeout(() => setFlash(false), 2500);
   }
@@ -411,6 +493,12 @@ function FillForm({
               {existing
                 ? `Last submitted ${new Date(existing.submittedAt).toLocaleString()}`
                 : "Not submitted yet"}
+              {!dirty && filledCount === 0 && (
+                <span className="ml-2 text-warn">Fill at least 1 KPI to submit</span>
+              )}
+              {dirty && filledCount > 0 && (
+                <span className="ml-2 text-ok">{filledCount}/{totalKpis} KPIs filled · Draft auto-saved</span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {flash && (

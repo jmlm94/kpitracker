@@ -75,6 +75,9 @@ export default function KPIsPage() {
 
         for (const t of state.targets) {
           if (!memberIds.has(t.ownerId)) continue;
+          // Only show KPIs tagged to THIS department to avoid duplication
+          // for multi-dept people (e.g. Thaylu).
+          if (t.departmentId && t.departmentId !== dept.id) continue;
           const kpi = state.kpis.find((k) => k.id === t.kpiId);
           const owner = state.team.find((m) => m.id === t.ownerId);
           if (!kpi || !owner) continue;
