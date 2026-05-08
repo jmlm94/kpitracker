@@ -229,29 +229,100 @@ export default function TeamMemberPage() {
 
       <section className="mt-4">
         <h2 className="section-title">Owned KPIs</h2>
-        <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-          {targets.length === 0 && (
-            <div className="card p-6 text-sm text-white/50">
-              No KPIs match the current filter.
-            </div>
-          )}
-          {targets.map((t) => {
-            const kpi = state.kpis.find((k) => k.id === t.kpiId);
-            if (!kpi) return null;
-            const tDept = state.departments.find((d) => d.id === t.departmentId);
+        {targets.length === 0 && (
+          <div className="card mt-3 p-6 text-sm text-white/50">
+            No KPIs match the current filter.
+          </div>
+        )}
+        {/* Group by department when the person spans multiple. Single-dept
+            people still get the cleaner flat grid. */}
+        {(() => {
+          const byDept = new Map<string, typeof targets>();
+          for (const t of targets) {
+            const key = t.departmentId || "__unassigned__";
+            const list = byDept.get(key) || [];
+            list.push(t);
+            byDept.set(key, list);
+          }
+          // Sort: primary dept first, then additional in member's order, then unassigned last
+          const orderedKeys: string[] = [];
+          if (byDept.has(member.departmentId)) orderedKeys.push(member.departmentId);
+          for (const id of member.additionalDepartmentIds || []) {
+            if (byDept.has(id) && !orderedKeys.includes(id)) orderedKeys.push(id);
+          }
+          for (const k of byDept.keys()) {
+            if (!orderedKeys.includes(k)) orderedKeys.push(k);
+          }
+
+          // If only one dept's worth of KPIs, render flat without sub-headers
+          if (orderedKeys.length <= 1) {
             return (
-              <KPICard
-                key={t.id}
-                kpi={kpi}
-                target={t}
-                progress={state.progress[t.id]}
-                owner={member}
-                deptColor={tDept?.color || dept?.color}
-                timeframe={timeframe}
-              />
+              <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+                {targets.map((t) => {
+                  const kpi = state.kpis.find((k) => k.id === t.kpiId);
+                  if (!kpi) return null;
+                  const tDept = state.departments.find((d) => d.id === t.departmentId);
+                  return (
+                    <KPICard
+                      key={t.id}
+                      kpi={kpi}
+                      target={t}
+                      progress={state.progress[t.id]}
+                      owner={member}
+                      deptColor={tDept?.color || dept?.color}
+                      timeframe={timeframe}
+                    />
+                  );
+                })}
+              </div>
             );
-          })}
-        </div>
+          }
+
+          return (
+            <div className="mt-3 space-y-6">
+              {orderedKeys.map((deptId) => {
+                const d =
+                  deptId === "__unassigned__"
+                    ? null
+                    : state.departments.find((x) => x.id === deptId);
+                const list = byDept.get(deptId) || [];
+                return (
+                  <div key={deptId}>
+                    <div className="mb-2 flex items-center gap-2 border-b border-white/5 pb-2">
+                      <span
+                        className="h-2.5 w-2.5"
+                        style={{ background: d?.color || "#888" }}
+                      />
+                      <span className="font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
+                        {d?.name || "Unassigned"}
+                      </span>
+                      <span className="font-numeric text-[10px] text-white/45">
+                        ({list.length} KPI{list.length === 1 ? "" : "s"})
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {list.map((t) => {
+                        const kpi = state.kpis.find((k) => k.id === t.kpiId);
+                        if (!kpi) return null;
+                        return (
+                          <KPICard
+                            key={t.id}
+                            kpi={kpi}
+                            target={t}
+                            progress={state.progress[t.id]}
+                            owner={member}
+                            deptColor={d?.color || dept?.color}
+                            timeframe={timeframe}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </section>
 
       {watching.length > 0 && (
