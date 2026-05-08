@@ -13,26 +13,51 @@ import {
   statusLabel,
 } from "@/lib/format";
 import { membersOfDepartment } from "@/lib/hierarchy";
+import type {
+  AppState,
+  Department,
+  KPI,
+  Target,
+  TeamMember,
+} from "@/lib/types";
+
+function currentPeriodKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function periodLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** Last 24 months ending with the current month. */
+function recentPeriods(): string[] {
+  const out: string[] = [];
+  const now = new Date();
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return out;
+}
 
 export default function KPIsPage() {
   const { state, ready } = useStore();
   const [query, setQuery] = useState("");
+  const [periodKey, setPeriodKey] = useState(currentPeriodKey());
   if (!ready) return null;
+
+  const isCurrentMonth = periodKey === currentPeriodKey();
+  const periods = recentPeriods();
 
   const mains = state.departments.filter((d) => d.kind === "main");
 
-  // Build a per-department section structure
-  type Row = {
-    target: (typeof state.targets)[0];
-    kpi: (typeof state.kpis)[0];
-    owner: (typeof state.team)[0];
-  };
-
-  type Section = {
-    dept: (typeof state.departments)[0];
-    rows: Row[];
-    children: Section[];
-  };
+  type Row = { target: Target; kpi: KPI; owner: TeamMember };
+  type Section = { dept: Department; rows: Row[]; children: Section[] };
 
   const sections = useMemo(() => {
     const q = query.toLowerCase();
@@ -43,7 +68,7 @@ export default function KPIsPage() {
         (d) => d.kind === "sub" && d.parentId === main.id,
       );
 
-      function buildSection(dept: (typeof state.departments)[0]): Section {
+      function buildSection(dept: Department): Section {
         const members = membersOfDepartment(state, dept.id);
         const memberIds = new Set(members.map((m) => m.id));
         const rows: Row[] = [];
@@ -80,8 +105,7 @@ export default function KPIsPage() {
   }, [state, query, mains]);
 
   const totalRows = sections.reduce(
-    (n, s) =>
-      n + s.rows.length + s.children.reduce((m, c) => m + c.rows.length, 0),
+    (n, s) => n + s.rows.length + s.children.reduce((m, c) => m + c.rows.length, 0),
     0,
   );
 
@@ -101,8 +125,23 @@ export default function KPIsPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mt-6 card flex items-end gap-3 p-4">
+      {/* Filters: month + search */}
+      <div className="mt-6 card flex flex-wrap items-end gap-3 p-4">
+        <div>
+          <label className="label">Month</label>
+          <select
+            value={periodKey}
+            onChange={(e) => setPeriodKey(e.target.value)}
+            className="input py-1.5 text-xs"
+          >
+            {periods.map((p) => (
+              <option key={p} value={p}>
+                {periodLabel(p)}
+                {p === currentPeriodKey() ? " (current)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex-1 max-w-sm">
           <label className="label">Search person or KPI</label>
           <div className="relative">
@@ -118,20 +157,34 @@ export default function KPIsPage() {
             />
           </div>
         </div>
-        {query && (
-          <button onClick={() => setQuery("")} className="btn-ghost py-1.5">
-            Clear
+        {(query || !isCurrentMonth) && (
+          <button
+            onClick={() => {
+              setQuery("");
+              setPeriodKey(currentPeriodKey());
+            }}
+            className="btn-ghost py-1.5"
+          >
+            Reset
           </button>
         )}
         <div className="ml-auto font-heading text-[11px] uppercase tracking-brand text-white/50">
           {totalRows} KPI{totalRows === 1 ? "" : "s"}
+          {!isCurrentMonth && (
+            <span className="ml-2 text-white/40">· read-only history</span>
+          )}
         </div>
       </div>
 
       {/* Department-grouped sections */}
       <div className="mt-6 space-y-8">
         {sections.map((section) => (
-          <DeptKPISection key={section.dept.id} section={section} />
+          <DeptKPISection
+            key={section.dept.id}
+            section={section}
+            periodKey={periodKey}
+            isCurrentMonth={isCurrentMonth}
+          />
         ))}
         {sections.length === 0 && (
           <div className="card p-8 text-center text-white/40">
@@ -145,23 +198,18 @@ export default function KPIsPage() {
 
 function DeptKPISection({
   section,
+  periodKey,
+  isCurrentMonth,
 }: {
-  section: {
-    dept: import("@/lib/types").Department;
-    rows: {
-      target: import("@/lib/types").Target;
-      kpi: import("@/lib/types").KPI;
-      owner: import("@/lib/types").TeamMember;
-    }[];
-    children: typeof section extends never ? never : any[];
-  };
+  section: { dept: Department; rows: any[]; children: any[] };
+  periodKey: string;
+  isCurrentMonth: boolean;
 }) {
   const { state } = useStore();
   const { dept, rows, children } = section;
 
   return (
     <section>
-      {/* Department header */}
       <div className="mb-3 flex items-center gap-3 border-b border-white/5 pb-2">
         <div className="h-3 w-3" style={{ background: dept.color }} />
         <Link
@@ -175,17 +223,19 @@ function DeptKPISection({
         </span>
       </div>
 
-      {/* Direct KPIs for this department */}
-      {rows.length > 0 && <KPITable rows={rows} state={state} />}
+      {rows.length > 0 && (
+        <KPITable
+          rows={rows}
+          state={state}
+          periodKey={periodKey}
+          isCurrentMonth={isCurrentMonth}
+        />
+      )}
 
-      {/* Sub-department sections */}
-      {children.map((child: typeof section) => (
+      {children.map((child: any) => (
         <div key={child.dept.id} className="mt-5 ml-6">
           <div className="mb-2 flex items-center gap-2">
-            <div
-              className="h-2 w-2"
-              style={{ background: child.dept.color }}
-            />
+            <div className="h-2 w-2" style={{ background: child.dept.color }} />
             <Link
               href={`/departments/${child.dept.id}`}
               className="font-heading text-[13px] font-semibold uppercase tracking-brand text-white hover:text-carbinox"
@@ -193,7 +243,12 @@ function DeptKPISection({
               {child.dept.name}
             </Link>
           </div>
-          <KPITable rows={child.rows} state={state} />
+          <KPITable
+            rows={child.rows}
+            state={state}
+            periodKey={periodKey}
+            isCurrentMonth={isCurrentMonth}
+          />
         </div>
       ))}
     </section>
@@ -203,13 +258,13 @@ function DeptKPISection({
 function KPITable({
   rows,
   state,
+  periodKey,
+  isCurrentMonth,
 }: {
-  rows: {
-    target: import("@/lib/types").Target;
-    kpi: import("@/lib/types").KPI;
-    owner: import("@/lib/types").TeamMember;
-  }[];
-  state: import("@/lib/types").AppState;
+  rows: { target: Target; kpi: KPI; owner: TeamMember }[];
+  state: AppState;
+  periodKey: string;
+  isCurrentMonth: boolean;
 }) {
   return (
     <div className="overflow-hidden border border-white/10">
@@ -225,9 +280,19 @@ function KPITable({
         </thead>
         <tbody className="divide-y divide-white/5">
           {rows.map(({ target: t, kpi, owner }) => {
-            const p = state.progress[t.id];
-            const actual = p ? pickProgressValue(kpi, p) : 0;
-            const ratio = p ? progressRatio(kpi, t, actual) : 0;
+            // Pull actual: current month → progress; past → submission
+            let actual: number | undefined;
+            if (isCurrentMonth) {
+              const p = state.progress[t.id];
+              actual = p ? pickProgressValue(kpi, p) : undefined;
+            } else {
+              const sub = (state.submissions || []).find(
+                (s) => s.ownerId === owner.id && s.periodKey === periodKey,
+              );
+              actual = sub?.values[t.id];
+            }
+            const hasActual = actual !== undefined && actual !== null;
+            const ratio = hasActual ? progressRatio(kpi, t, actual!) : 0;
             const status = classifyStatus(ratio);
             return (
               <tr key={t.id} className="hover:bg-white/[0.02]">
@@ -246,18 +311,24 @@ function KPITable({
                   {formatValueFull(t.target, kpi.unit)}
                 </td>
                 <td className="px-4 py-2.5 text-right font-numeric text-white">
-                  {p ? formatValueFull(actual, kpi.unit) : "—"}
-                  {p && (
+                  {hasActual ? formatValueFull(actual!, kpi.unit) : "—"}
+                  {hasActual && (
                     <div className="text-[11px] text-white/40">
                       {Math.round(ratio * 100)}%
                     </div>
                   )}
                 </td>
                 <td className="px-4 py-2.5">
-                  <span className={`chip ${statusBg(status)}`}>
-                    <span className="h-1.5 w-1.5 bg-current" />
-                    {statusLabel(status)}
-                  </span>
+                  {hasActual ? (
+                    <span className={`chip ${statusBg(status)}`}>
+                      <span className="h-1.5 w-1.5 bg-current" />
+                      {statusLabel(status)}
+                    </span>
+                  ) : (
+                    <span className="chip border-white/10 text-white/40">
+                      Not reported
+                    </span>
+                  )}
                 </td>
               </tr>
             );

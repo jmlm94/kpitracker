@@ -405,6 +405,8 @@ const targets: Target[] = kpiSpecs.map((s) => ({
   periodKey: PERIOD,
 }));
 
+// Default progress is ZERO for everything — actuals get filled in via the
+// "Fill KPIs Here" flow / Settings / Monthly Reports.
 const progress = Object.fromEntries(
   kpiSpecs.map((s) => {
     const tid = `t_${s.id.replace("kpi_", "")}`;
@@ -412,11 +414,11 @@ const progress = Object.fromEntries(
       tid,
       {
         targetId: tid,
-        today: s.today,
-        last7: s.last7,
-        mtd: s.mtd,
+        today: 0,
+        last7: 0,
+        mtd: 0,
         updatedAt: new Date().toISOString(),
-        samples: buildSamples(s.last7, 400, s.unit),
+        samples: [],
       },
     ];
   }),

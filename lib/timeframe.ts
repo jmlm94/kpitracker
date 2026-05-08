@@ -8,16 +8,16 @@ export type Timeframe =
   | "7d"
   | "mtd"
   | "last_month"
-  | "90d"
-  | "180d"
-  | "365d";
+  | "last_3m"
+  | "last_6m"
+  | "last_12m";
 
 export const TIMEFRAMES: { value: Timeframe; label: string; short: string }[] = [
   { value: "mtd", label: "This month", short: "MTD" },
   { value: "last_month", label: "Last month", short: "1 MO" },
-  { value: "90d", label: "Last 90 days", short: "90 D" },
-  { value: "180d", label: "Last 180 days", short: "180 D" },
-  { value: "365d", label: "Last 365 days", short: "365 D" },
+  { value: "last_3m", label: "Last 3 months", short: "3 MO" },
+  { value: "last_6m", label: "Last 6 months", short: "6 MO" },
+  { value: "last_12m", label: "Last 12 months", short: "12 MO" },
 ];
 
 const STORAGE_KEY = "carbinox-kpi-tracker:timeframe";
@@ -76,15 +76,18 @@ export function rangeFor(timeframe: Timeframe, now = new Date()): [string, strin
       const lastMonthStart = new Date(end.getFullYear(), end.getMonth() - 1, 1);
       return [isoDay(lastMonthStart), isoDay(lastMonthEnd)];
     }
-    case "90d":
-      start.setDate(end.getDate() - 89);
-      break;
-    case "180d":
-      start.setDate(end.getDate() - 179);
-      break;
-    case "365d":
-      start.setDate(end.getDate() - 364);
-      break;
+    case "last_3m": {
+      const s = new Date(end.getFullYear(), end.getMonth() - 2, 1);
+      return [isoDay(s), isoDay(end)];
+    }
+    case "last_6m": {
+      const s = new Date(end.getFullYear(), end.getMonth() - 5, 1);
+      return [isoDay(s), isoDay(end)];
+    }
+    case "last_12m": {
+      const s = new Date(end.getFullYear(), end.getMonth() - 11, 1);
+      return [isoDay(s), isoDay(end)];
+    }
   }
   return [isoDay(start), isoDay(end)];
 }

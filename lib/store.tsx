@@ -175,7 +175,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           const next = exists
             ? filtered.map((x) => (x.id === sub.id ? sub : x))
             : [...filtered, sub];
-          return { ...s, submissions: next };
+
+          // If this submission is for the CURRENT month, also write the values
+          // into progress so the dashboard / KPI cards reflect the new numbers.
+          const now = new Date();
+          const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          let nextProgress = s.progress;
+          if (sub.periodKey === cur) {
+            nextProgress = { ...s.progress };
+            const today = now.toISOString().slice(0, 10);
+            const updatedAt = now.toISOString();
+            Object.entries(sub.values).forEach(([targetId, value]) => {
+              const prev = nextProgress[targetId];
+              const samples = prev?.samples ? [...prev.samples] : [];
+              // Replace today's sample (or append)
+              const existingIdx = samples.findIndex((x) => x.date === today);
+              if (existingIdx >= 0) samples[existingIdx] = { date: today, value };
+              else samples.push({ date: today, value });
+              nextProgress[targetId] = {
+                targetId,
+                today: value,
+                last7: value,
+                mtd: value,
+                updatedAt,
+                samples,
+              };
+            });
+          }
+          return { ...s, submissions: next, progress: nextProgress };
         }),
       removeSubmission: (id) =>
         setState((s) => ({
