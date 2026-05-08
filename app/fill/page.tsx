@@ -267,9 +267,12 @@ function FillForm({
   const [draft, setDraft] = useState<Record<string, number>>(initial);
   const [notes, setNotes] = useState(existing?.notes || "");
 
-  // Re-seed draft when period or existing changes
+  // Re-seed draft only when the (member, period) changes or when a new
+  // submission was just persisted (existing.submittedAt). Without this
+  // gate the effect re-fired on every keystroke and reset what the user
+  // had just typed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // Load saved draft from localStorage if it exists
     try {
       const saved = window.localStorage.getItem(DRAFT_KEY);
       if (saved) {
@@ -281,7 +284,7 @@ function FillForm({
     } catch {}
     setDraft(initial);
     setNotes(existing?.notes || "");
-  }, [DRAFT_KEY, initial, existing?.notes]);
+  }, [DRAFT_KEY, existing?.submittedAt]);
 
   // Auto-save draft every 5 seconds
   useEffect(() => {
