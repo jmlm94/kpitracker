@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { Avatar } from "@/components/Avatar";
 import { cx } from "@/lib/format";
@@ -17,10 +17,12 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Download,
   Plus,
   RotateCcw,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 
 const providerOptions: { value: Provider; label: string }[] = [
@@ -123,16 +125,61 @@ export default function SettingsPage() {
 }
 
 function DangerZone() {
-  const { reset } = useStore();
+  const { state, ready, reset, setState } = useStore();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function exportData() {
+    const data = {
+      __version: 1,
+      __exportedAt: new Date().toISOString(),
+      state,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    a.download = `carbinox-kpi-backup-${stamp}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importData(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = reader.result as string;
+        const parsed = JSON.parse(text);
+        const restoreState = parsed.state || parsed; // accept raw state too
+        if (!restoreState.departments || !restoreState.team) {
+          alert("That file doesn't look like a valid Carbinox backup.");
+          return;
+        }
+        const ok = confirm(
+          `Import this backup?\n\nIt contains:\n• ${restoreState.team?.length || 0} team members\n• ${restoreState.departments?.length || 0} departments\n• ${restoreState.kpis?.length || 0} KPIs\n• ${restoreState.submissions?.length || 0} monthly submissions\n\nThis REPLACES your current data in this browser.`,
+        );
+        if (!ok) return;
+        setState(() => restoreState);
+        alert("Backup imported successfully.");
+      } catch (err: any) {
+        alert(`Couldn't read that file: ${err?.message || "invalid JSON"}`);
+      }
+    };
+    reader.readAsText(file);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
   function confirmReset() {
     const ok = confirm(
       "Reset to defaults?\n\nThis wipes ALL data in your browser:\n• Every KPI value you've entered\n• Every monthly submission\n• Profile picture uploads\n• PINs you've set\n• Department/team customizations made via the UI\n\nThe seed (people, departments, KPIs, targets) reloads fresh with all values at zero.\n\nThis only affects YOUR browser — other team members on other devices keep their data.\n\nProceed?",
     );
     if (!ok) return;
     try {
-      // Clear the main store
       window.localStorage.removeItem("carbinox-kpi-tracker:v1");
-      // Clear any active member + drafts
       window.localStorage.removeItem("carbinox-kpi-tracker:active_member");
       Object.keys(window.localStorage).forEach((k) => {
         if (k.startsWith("carbinox-kpi-draft:")) {
@@ -145,21 +192,48 @@ function DangerZone() {
   }
 
   return (
-    <section className="mt-12 card border-bad/30 bg-bad/5 p-5">
-      <div className="bracket text-bad">Danger Zone</div>
-      <h2 className="mt-1 font-display text-xl font-extrabold uppercase tracking-brand text-white">
-        Reset to defaults
-      </h2>
-      <p className="mt-2 text-sm text-white/60">
-        Wipes your browser's stored state and reloads the latest seed (people,
-        departments, KPIs from the spec — all values at zero). Use this if you
-        want to start fresh, or if old data is showing up that you no longer
-        want.
-      </p>
-      <button onClick={confirmReset} className="btn-danger mt-4">
-        Reset to defaults
-      </button>
-    </section>
+    <>
+      <section className="mt-12 card border-carbinox/30 bg-carbinox/5 p-5">
+        <div className="bracket text-carbinox">Backup & Restore</div>
+        <h2 className="mt-1 font-display text-xl font-extrabold uppercase tracking-brand text-white">
+          Export / Import Data
+        </h2>
+        <p className="mt-2 text-sm text-white/65">
+          Your data lives in your browser's local storage — different URLs (production, preview, branch) each have their own separate copy. <b className="text-white">Export</b> a JSON backup before any risky change, then <b className="text-white">Import</b> it on the URL you actually use to put everything back exactly as it was.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button onClick={exportData} disabled={!ready} className="btn-primary">
+            <Download size={13} /> Export backup
+          </button>
+          <button onClick={() => fileRef.current?.click()} className="btn-ghost">
+            <Upload size={13} /> Import backup
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={importData}
+            className="hidden"
+          />
+        </div>
+      </section>
+
+      <section className="mt-6 card border-bad/30 bg-bad/5 p-5">
+        <div className="bracket text-bad">Danger Zone</div>
+        <h2 className="mt-1 font-display text-xl font-extrabold uppercase tracking-brand text-white">
+          Reset to defaults
+        </h2>
+        <p className="mt-2 text-sm text-white/60">
+          Wipes your browser's stored state and reloads the latest seed (people,
+          departments, KPIs from the spec — all values at zero). Use this if you
+          want to start fresh, or if old data is showing up that you no longer
+          want. <b className="text-white">Tip:</b> export a backup first so you can restore later.
+        </p>
+        <button onClick={confirmReset} className="btn-danger mt-4">
+          Reset to defaults
+        </button>
+      </section>
+    </>
   );
 }
 
