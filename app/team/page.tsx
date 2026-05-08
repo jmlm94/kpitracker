@@ -118,7 +118,7 @@ function TeamCard({ id, deptColor, isHead }: { id: string; deptColor?: string; i
         isHead ? "border-carbinox/40" : "",
       )}
     >
-      <Avatar name={m.name} color={deptColor} size={42} />
+      <Avatar name={m.name} color={deptColor} size={42} avatarUrl={m.avatarUrl} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate font-heading text-[13px] font-semibold uppercase tracking-brand text-white">

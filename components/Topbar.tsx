@@ -1,63 +1,24 @@
 "use client";
 
-import { RefreshCw, CheckCircle2, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 
 export function Topbar() {
-  const { state, setProgress } = useStore();
-  const [running, setRunning] = useState(false);
-  const [flash, setFlash] = useState(false);
-  // "Auto-saved" flash whenever the store state changes (localStorage persist)
+  const { state } = useStore();
   const [savedFlash, setSavedFlash] = useState(false);
   const firstPassRef = useRef(true);
-  const saveFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    // Skip the very first render; only flash on subsequent changes
     if (firstPassRef.current) {
       firstPassRef.current = false;
       return;
     }
     setSavedFlash(true);
-    if (saveFlashTimerRef.current) clearTimeout(saveFlashTimerRef.current);
-    saveFlashTimerRef.current = setTimeout(() => setSavedFlash(false), 1400);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setSavedFlash(false), 1400);
   }, [state]);
-
-  async function refresh() {
-    setRunning(true);
-    try {
-      // Collect credentials from each integration that has them
-      const credentials: Record<string, Record<string, string>> = {};
-      for (const i of state.integrations) {
-        if (i.credentials && Object.keys(i.credentials).length > 0) {
-          credentials[i.provider] = i.credentials;
-        }
-      }
-      const res = await fetch("/api/sync/all", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kpis: state.kpis, targets: state.targets, credentials }),
-      });
-      const data = (await res.json()) as {
-        progress: Record<string, { today: number; last7: number; mtd: number; samples: { date: string; value: number }[] }>;
-      };
-      const now = new Date().toISOString();
-      Object.entries(data.progress).forEach(([targetId, p]) => {
-        setProgress(targetId, { ...p, targetId, updatedAt: now });
-      });
-      setFlash(true);
-      setTimeout(() => setFlash(false), 1800);
-    } catch {
-      // swallow
-    } finally {
-      setRunning(false);
-    }
-  }
-
-  const lastUpdated = Object.values(state.progress).reduce<string | undefined>(
-    (acc, p) => (!acc || (p.updatedAt && p.updatedAt > acc) ? p.updatedAt : acc),
-    undefined,
-  );
 
   const month = new Date().toLocaleString("en-US", { month: "long", year: "numeric" });
 
@@ -76,23 +37,6 @@ export function Topbar() {
               <Save size={10} /> Saved
             </span>
           )}
-          {lastUpdated && (
-            <span className="hidden font-numeric text-[11px] uppercase tracking-brand text-white/50 md:inline">
-              Last sync · {new Date(lastUpdated).toLocaleString()}
-            </span>
-          )}
-          <button
-            onClick={refresh}
-            disabled={running}
-            className="btn-primary disabled:opacity-50"
-          >
-            {flash ? (
-              <CheckCircle2 size={14} />
-            ) : (
-              <RefreshCw size={14} className={running ? "animate-spin" : ""} />
-            )}
-            {running ? "Syncing…" : flash ? "Synced" : "Sync now"}
-          </button>
         </div>
       </div>
     </header>

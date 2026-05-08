@@ -16,7 +16,7 @@ const departments: Department[] = [
   { id: "dep_exec", name: "Executive", color: "#f8f8f8", kind: "main", headId: "tm_jose" },
   { id: "dep_marketing", name: "Marketing & Advertising", color: "#f8c808", kind: "main", headId: "tm_damian" },
   { id: "dep_retention", name: "Retention", color: "#10a0f8", kind: "main", headId: "tm_samra" },
-  { id: "dep_cx", name: "Customer Experience", color: "#ffd833", kind: "main", headId: "tm_doralee" },
+  { id: "dep_cx", name: "Experience", color: "#ffd833", kind: "main", headId: "tm_thaylu" },
   { id: "dep_revenue", name: "Revenue", color: "#48f088", kind: "main", headId: "tm_damian" },
   { id: "dep_finops", name: "Finance & Operations", color: "#a78bfa", kind: "main", headId: "tm_jaime" },
 
@@ -43,7 +43,7 @@ const team: TeamMember[] = [
   // Executive
   { id: "tm_jose", name: "Jose Lepage", position: "CEO", departmentId: "dep_exec" },
   // Thaylu wears multiple hats: EA / Acting CXO / Head of Team Success / Head of Supply Chain
-  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Acting CXO · Head of Team Success · Head of Supply Chain", departmentId: "dep_exec", additionalDepartmentIds: ["dep_team_success", "dep_supply_chain"], managerIds: ["tm_jose"] },
+  { id: "tm_thaylu", name: "Thaylu Rojas", position: "Chief of Experience · Head of Team Success · Head of Supply Chain", departmentId: "dep_exec", additionalDepartmentIds: ["dep_cx", "dep_team_success", "dep_supply_chain"], managerIds: ["tm_jose"] },
 
   // Marketing & Advertising — Advertising
   // Damian: Head of Advertising (primary) + TikTok/AppLovin/Reddit Buyer + Head of Website
@@ -52,15 +52,20 @@ const team: TeamMember[] = [
   { id: "tm_kristaps", name: "Kristaps Krauklis", position: "Meta & Snap Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
   { id: "tm_ivana", name: "Ivana Vitali", position: "Google Media Buyer", departmentId: "dep_advertising", managerIds: ["tm_damian"] },
 
-  // Creative — Strategists + Video Editors + Graphic Designer
+  // Creative — Four pods: each Strategist has an Editor under them + Winder in all pods
+  // Pod 1: Oli → Paul R. + Winder
   { id: "tm_oli", name: "Oli Cimet", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+  { id: "tm_paul", name: "Paul R.", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_oli"] },
+  // Pod 2: Malu → Dante + Winder
   { id: "tm_malu", name: "Malu Celestino", position: "Creative Strategist", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+  { id: "tm_dante", name: "Dante Vilar", position: "Creative Strategist · Video Editor", departmentId: "dep_creative", managerIds: ["tm_malu"] },
+  // Pod 3: Maria → Pedro + Winder
   { id: "tm_maria", name: "Maria Paula Dominguez", position: "Creative Strategist · TikTok Shop Specialist", departmentId: "dep_creative", additionalDepartmentIds: ["dep_content"], managerIds: ["tm_damian"] },
-  { id: "tm_dante", name: "Dante Vilar", position: "Creative Strategist · Video Editor", departmentId: "dep_creative", managerIds: ["tm_damian"] },
-  { id: "tm_pedro", name: "Pedro Raze", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_damian"] },
-  { id: "tm_sami", name: "Sami Mughal", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_damian"] },
-  { id: "tm_paul", name: "Paul R.", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_damian"] },
-  { id: "tm_winder", name: "Winder Buznego", position: "Graphic Designer", departmentId: "dep_creative", managerIds: ["tm_damian"] },
+  { id: "tm_pedro", name: "Pedro Raze", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_maria"] },
+  // Pod 4: Dante → Sami + Winder
+  { id: "tm_sami", name: "Sami Mughal", position: "Video Editor", departmentId: "dep_creative", managerIds: ["tm_dante"] },
+  // Winder is the shared graphic designer — reports to all 4 strategists
+  { id: "tm_winder", name: "Winder Buznego", position: "Graphic Designer", departmentId: "dep_creative", managerIds: ["tm_oli", "tm_malu", "tm_maria", "tm_dante"] },
 
   // Content & Affiliate
   { id: "tm_jesus_dw", name: "Jesus de Windt", position: "Content Manager · TikTok Shop Specialist", departmentId: "dep_content", managerIds: ["tm_damian"] },
