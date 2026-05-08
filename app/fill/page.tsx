@@ -48,13 +48,26 @@ export default function FillPage() {
   const { state, ready } = useStore();
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Restore active member from localStorage
+  // Restore active member from URL param (for /fill?user=tm_xxx) or localStorage
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(ACTIVE_KEY);
-      if (raw) setActiveId(raw);
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const userParam = params.get("user");
+        if (userParam && state.team.some((m) => m.id === userParam)) {
+          setActiveId(userParam);
+          window.localStorage.setItem(ACTIVE_KEY, userParam);
+          // Clean URL
+          const url = new URL(window.location.href);
+          url.searchParams.delete("user");
+          window.history.replaceState({}, "", url.toString());
+          return;
+        }
+        const raw = window.localStorage.getItem(ACTIVE_KEY);
+        if (raw) setActiveId(raw);
+      }
     } catch {}
-  }, []);
+  }, [state.team]);
 
   function logIn(id: string) {
     setActiveId(id);
@@ -318,6 +331,15 @@ function FillForm({
     setDraft((d) => ({ ...d, [id]: value }));
   }
   function save() {
+    // Round values to clean precision before storing (#5)
+    const cleanValues: Record<string, number> = {};
+    for (const [tid, val] of Object.entries(draft)) {
+      const t = targets.find((x) => x.id === tid);
+      const kpi = t ? state.kpis.find((k) => k.id === t.kpiId) : null;
+      cleanValues[tid] = kpi
+        ? Math.round(val * 10000) / 10000 // 4 decimal max, avoids float32 artifacts
+        : val;
+    }
     const sub: MonthlySubmission = {
       id:
         existing?.id ||
@@ -325,7 +347,7 @@ function FillForm({
       ownerId: member.id,
       periodKey,
       submittedAt: new Date().toISOString(),
-      values: draft,
+      values: cleanValues,
       notes: notes.trim() || undefined,
     };
     upsertSubmission(sub);
@@ -496,37 +518,45 @@ function FillForm({
               {existing
                 ? `Last submitted ${new Date(existing.submittedAt).toLocaleString()}`
                 : "Not submitted yet"}
-              {!dirty && filledCount === 0 && (
+              {filledCount === 0 && !existing && (
                 <span className="ml-2 text-warn">Fill at least 1 KPI to submit</span>
               )}
-              {dirty && filledCount > 0 && (
-                <span className="ml-2 text-ok">{filledCount}/{totalKpis} KPIs filled · Draft auto-saved</span>
+              {filledCount > 0 && (
+                <span className="ml-2 text-white/40">{filledCount}/{totalKpis} filled</span>
               )}
             </div>
             <div className="flex items-center gap-2">
               {flash && (
                 <span className="chip border-ok/60 bg-ok/10 text-ok">
-                  <Check size={10} /> Submitted!
+                  <Check size={10} /> Saved!
                 </span>
               )}
               {dirty && !flash && (
                 <span className="chip border-carbinox/60 bg-carbinox/10 text-carbinox">
-                  Unsaved
+                  Unsaved changes
+                </span>
+              )}
+              {!dirty && !flash && existing && (
+                <span className="chip border-ok/40 bg-ok/5 text-ok">
+                  <Check size={10} /> Up to date
                 </span>
               )}
               <button
                 onClick={() => {
-                  setDraft(initial);
-                  setNotes(existing?.notes || "");
+                  if (confirm("Clear all values back to 0?")) {
+                    const zeroed: Record<string, number> = {};
+                    for (const t of targets) zeroed[t.id] = 0;
+                    setDraft(zeroed);
+                    setNotes("");
+                  }
                 }}
-                disabled={!dirty}
-                className="btn-ghost disabled:opacity-40"
+                className="btn-ghost"
               >
                 <RotateCcw size={12} /> Reset
               </button>
               <button
                 onClick={save}
-                disabled={!dirty}
+                disabled={!dirty && !!existing}
                 className="btn-primary disabled:opacity-40"
               >
                 <Check size={14} />

@@ -9,8 +9,10 @@ import {
   cx,
   formatValue,
   formatValueFull,
+  isReported as checkReported,
   pickProgressValue,
   progressRatio,
+  roundForUnit,
   statusBg,
   statusLabel,
   statusSolid,
@@ -49,9 +51,10 @@ export function KPICard({
     : progress
       ? pickProgressValue(kpi, progress)
       : 0;
+  const reported = checkReported(progress);
   const ratio = progress ? progressRatio(kpi, target, actual) : 0;
-  const status = classifyStatus(ratio);
-  const pct = Math.min(120, Math.round(ratio * 100));
+  const status = classifyStatus(ratio, reported);
+  const pct = Math.min(100, Math.round(ratio * 100));
   const statusColor = statusSolid(status);
 
   const todayValue = progress ? tfToday(progress) : 0;

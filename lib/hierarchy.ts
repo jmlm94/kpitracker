@@ -1,5 +1,5 @@
 import type { AppState, Department, Target, TeamMember } from "./types";
-import { classifyStatus, pickProgressValue, progressRatio } from "./format";
+import { classifyStatus, isReported, pickProgressValue, progressRatio } from "./format";
 
 /** Every department a person belongs to (primary first, then additional). */
 export function memberDepartmentIds(person: TeamMember): string[] {
@@ -85,9 +85,11 @@ export function aggregateDepartmentStats(
     const kpi = state.kpis.find((k) => k.id === t.kpiId);
     const p = state.progress[t.id];
     if (!kpi || !p) continue;
+    const reported = isReported(p);
     const r = progressRatio(kpi, t, pickProgressValue(kpi, p));
+    const s = classifyStatus(r, reported);
+    if (s === "not_reported") continue;
     sum += Math.min(1.2, r);
-    const s = classifyStatus(r);
     if (s === "ahead") ahead++;
     else if (s === "on_track") on_track++;
     else if (s === "at_risk") at_risk++;

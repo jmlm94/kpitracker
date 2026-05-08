@@ -7,7 +7,7 @@ export type Provider =
   | "gsheets"
   | "manual";
 
-export type Direction = "higher_is_better" | "lower_is_better";
+export type Direction = "higher_is_better" | "lower_is_better" | "band";
 
 export type Unit = "number" | "currency" | "percent" | "ratio" | "duration_s";
 

@@ -124,7 +124,7 @@ const kpiSpecs: KpiSpec[] = [
     65, "tm_damian", "dep_advertising", ["tm_jose"], 70, 67, 66),
   k("winning_creative_rate", "Winning Creative Rate", "% of creatives that beat control.", "percent", "higher_is_better", "gsheets", "creative.winning_rate", "mtd",
     15, "tm_damian", "dep_advertising", ["tm_jose"], 12, 13, 14),
-  k("spend_pacing_blended", "Spend Pacing", "Actual monthly spend vs. forecasted (±10% of forecast).", "percent", "lower_is_better", "triplewhale", "blended.spend_pacing", "mtd",
+  k("spend_pacing_blended", "Spend Pacing", "Actual monthly spend vs. forecasted (±10% of forecast).", "percent", "band", "triplewhale", "blended.spend_pacing", "mtd",
     10, "tm_damian", "dep_advertising", ["tm_jose"], 6, 7, 8),
 
   // ── META MEDIA BUYER — Simona / Kristaps ──────────────────────────────
@@ -132,7 +132,7 @@ const kpiSpecs: KpiSpec[] = [
     1.66, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 1.5, 1.6, 1.62),
   k("meta_cac", "Meta CAC", "Meta spend ÷ new customers attributed to Meta.", "currency", "lower_is_better", "triplewhale", "meta.cac", "mtd",
     65, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 70, 67, 66),
-  k("meta_pacing", "Meta Spend Pacing", "Actual Meta spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "meta.spend_pacing", "mtd",
+  k("meta_pacing", "Meta Spend Pacing", "Actual Meta spend vs. forecasted (±10%).", "percent", "band", "triplewhale", "meta.spend_pacing", "mtd",
     10, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 6, 7, 8),
 
   // ── META/SNAP MEDIA BUYER — Kristaps (same targets, separate ownership) ──
@@ -140,13 +140,13 @@ const kpiSpecs: KpiSpec[] = [
     1.66, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
   k("kristaps_meta_cac", "Meta CAC", "Meta spend ÷ new customers attributed to Meta.", "currency", "lower_is_better", "triplewhale", "meta.cac", "mtd",
     65, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
-  k("kristaps_meta_pacing", "Meta Spend Pacing", "Actual Meta spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "meta.spend_pacing", "mtd",
+  k("kristaps_meta_pacing", "Meta Spend Pacing", "Actual Meta spend vs. forecasted (±10%).", "percent", "band", "triplewhale", "meta.spend_pacing", "mtd",
     10, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
   k("kristaps_snap_roas", "Snap Platform ROAS", "Snap revenue ÷ Snap spend.", "ratio", "higher_is_better", "triplewhale", "snap.roas", "mtd",
     1.80, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
   k("kristaps_snap_cac", "Snap CAC", "Snap spend ÷ new customers attributed to Snap.", "currency", "lower_is_better", "triplewhale", "snap.cac", "mtd",
     75, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
-  k("kristaps_snap_pacing", "Snap Spend Pacing", "Actual Snap spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "snap.spend_pacing", "mtd",
+  k("kristaps_snap_pacing", "Snap Spend Pacing", "Actual Snap spend vs. forecasted (±10%).", "percent", "band", "triplewhale", "snap.spend_pacing", "mtd",
     10, "tm_kristaps", "dep_advertising", ["tm_simona", "tm_damian"], 0, 0, 0),
 
   // ── GOOGLE MEDIA BUYER — Ivana ────────────────────────────────────────
@@ -154,7 +154,7 @@ const kpiSpecs: KpiSpec[] = [
     3.0, "tm_ivana", "dep_advertising", ["tm_damian"], 2.8, 2.9, 2.95),
   k("google_cac", "Google CAC", "Google spend ÷ new customers attributed to Google.", "currency", "lower_is_better", "triplewhale", "google.cac", "mtd",
     50, "tm_ivana", "dep_advertising", ["tm_damian"], 52, 51, 50),
-  k("google_pacing", "Google Spend Pacing", "Actual Google spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "google.spend_pacing", "mtd",
+  k("google_pacing", "Google Spend Pacing", "Actual Google spend vs. forecasted (±10%).", "percent", "band", "triplewhale", "google.spend_pacing", "mtd",
     10, "tm_ivana", "dep_advertising", ["tm_damian"], 5, 6, 7),
 
   // ── SNAP MEDIA BUYER — Simona / Kristaps ──────────────────────────────
@@ -162,7 +162,7 @@ const kpiSpecs: KpiSpec[] = [
     1.80, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 1.6, 1.7, 1.75),
   k("snap_cac", "Snap CAC", "Snap spend ÷ new customers attributed to Snap.", "currency", "lower_is_better", "triplewhale", "snap.cac", "mtd",
     75, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 80, 77, 76),
-  k("snap_pacing", "Snap Spend Pacing", "Actual Snap spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "snap.spend_pacing", "mtd",
+  k("snap_pacing", "Snap Spend Pacing", "Actual Snap spend vs. forecasted (±10%).", "percent", "band", "triplewhale", "snap.spend_pacing", "mtd",
     10, "tm_simona", "dep_advertising", ["tm_kristaps", "tm_damian"], 6, 7, 8),
 
   // ── TIKTOK MEDIA BUYER — Damian ───────────────────────────────────────
@@ -170,7 +170,7 @@ const kpiSpecs: KpiSpec[] = [
     1.5, "tm_damian", "dep_advertising", ["tm_jose"], 1.3, 1.4, 1.45),
   k("tiktok_cac", "TikTok CAC", "TikTok spend ÷ new customers attributed to TikTok.", "currency", "lower_is_better", "triplewhale", "tiktok.cac", "mtd",
     70, "tm_damian", "dep_advertising", ["tm_jose"], 75, 72, 71),
-  k("tiktok_pacing", "TikTok Spend Pacing", "Actual TikTok spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "tiktok.spend_pacing", "mtd",
+  k("tiktok_pacing", "TikTok Spend Pacing", "Actual TikTok spend vs. forecasted (±10%).", "percent", "band", "triplewhale", "tiktok.spend_pacing", "mtd",
     10, "tm_damian", "dep_advertising", ["tm_jose"], 5, 6, 7),
 
   // ── APPLOVIN MEDIA BUYER — Damian ─────────────────────────────────────
@@ -178,7 +178,7 @@ const kpiSpecs: KpiSpec[] = [
     1.5, "tm_damian", "dep_advertising", ["tm_jose"], 1.3, 1.4, 1.45),
   k("applovin_cac", "AppLovin CAC", "AppLovin spend ÷ new customers attributed.", "currency", "lower_is_better", "triplewhale", "applovin.cac", "mtd",
     80, "tm_damian", "dep_advertising", ["tm_jose"], 85, 82, 81),
-  k("applovin_pacing", "AppLovin Spend Pacing", "Actual AppLovin spend vs. forecasted (±10%).", "percent", "lower_is_better", "triplewhale", "applovin.spend_pacing", "mtd",
+  k("applovin_pacing", "AppLovin Spend Pacing", "Actual AppLovin spend vs. forecasted (±10%).", "percent", "band", "triplewhale", "applovin.spend_pacing", "mtd",
     10, "tm_damian", "dep_advertising", ["tm_jose"], 6, 7, 8),
 
   // ── REDDIT MEDIA BUYER — Damian ───────────────────────────────────────
@@ -186,7 +186,7 @@ const kpiSpecs: KpiSpec[] = [
     2.0, "tm_damian", "dep_advertising", ["tm_jose"], 1.8, 1.9, 1.95),
   k("reddit_cac", "Reddit CAC", "Reddit spend ÷ new customers attributed to Reddit.", "currency", "lower_is_better", "manual", "reddit.cac", "mtd",
     75, "tm_damian", "dep_advertising", ["tm_jose"], 80, 77, 76),
-  k("reddit_pacing", "Reddit Spend Pacing", "Actual Reddit spend vs. forecasted (±10%).", "percent", "lower_is_better", "manual", "reddit.spend_pacing", "mtd",
+  k("reddit_pacing", "Reddit Spend Pacing", "Actual Reddit spend vs. forecasted (±10%).", "percent", "band", "manual", "reddit.spend_pacing", "mtd",
     10, "tm_damian", "dep_advertising", ["tm_jose"], 5, 6, 7),
 
   // ── CREATIVE STRATEGISTS — Oli ───────────────────────────────────────

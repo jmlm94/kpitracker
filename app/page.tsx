@@ -9,6 +9,7 @@ import { TimeframeSelector } from "@/components/TimeframeSelector";
 import {
   classifyStatus,
   formatValue,
+  isReported,
   pickProgressValue,
   progressRatio,
   statusBg,
@@ -30,8 +31,9 @@ export default function DashboardPage() {
       if (!kpi || !p) return null;
       const owner = state.team.find((m) => m.id === t.ownerId);
       const actual = aggregate(kpi, p, timeframe);
+      const reported = isReported(p);
       const ratio = progressRatio(kpi, t, actual);
-      return { target: t, kpi, progress: p, actual, ratio, owner };
+      return { target: t, kpi, progress: p, actual, ratio, owner, reported };
     })
     .filter((x): x is NonNullable<typeof x> => !!x);
 
@@ -47,27 +49,37 @@ export default function DashboardPage() {
 
   const totals = rows.reduce(
     (acc, r) => {
+      const s = classifyStatus(r.ratio, r.reported);
+      if (s === "not_reported") { acc.not_reported++; acc.count++; return acc; }
       acc.sum += Math.min(1.2, r.ratio);
-      const s = classifyStatus(r.ratio);
       if (s === "ahead") acc.ahead++;
       else if (s === "on_track") acc.on_track++;
       else if (s === "at_risk") acc.at_risk++;
       else acc.off_track++;
       acc.count++;
+      acc.reportedCount++;
       return acc;
     },
-    { sum: 0, count: 0, ahead: 0, on_track: 0, at_risk: 0, off_track: 0 },
+    { sum: 0, count: 0, reportedCount: 0, ahead: 0, on_track: 0, at_risk: 0, off_track: 0, not_reported: 0 },
   );
-  const overallPct = totals.count ? totals.sum / totals.count : 0;
+  const overallPct = totals.reportedCount ? totals.sum / totals.reportedCount : 0;
 
-  // Top N risks (sorted ascending by ratio — the most behind first)
+  // Needs Attention: only reported KPIs that are OFF TRACK or AT RISK
   const risks = [...rows]
-    .filter((r) => r.actual !== 0)
+    .filter((r) => {
+      if (!r.reported) return false;
+      const s = classifyStatus(r.ratio, r.reported);
+      return s === "off_track" || s === "at_risk";
+    })
     .sort((a, b) => a.ratio - b.ratio)
     .slice(0, 6);
-  // Winning KPIs (ahead of target, best first)
+  // Winning: only reported KPIs that are ON TRACK or AHEAD — no overlap with risks
   const winning = rows
-    .filter((r) => r.actual !== 0 && (classifyStatus(r.ratio) === "ahead" || classifyStatus(r.ratio) === "on_track"))
+    .filter((r) => {
+      if (!r.reported) return false;
+      const s = classifyStatus(r.ratio, r.reported);
+      return s === "on_track" || s === "ahead";
+    })
     .sort((a, b) => b.ratio - a.ratio)
     .slice(0, 6);
 
@@ -171,7 +183,7 @@ export default function DashboardPage() {
         <SummaryTile
           label="Needs attention"
           value={String(totals.at_risk + totals.off_track)}
-          hint={`${totals.at_risk} at risk · ${totals.off_track} off track`}
+          hint={`${totals.at_risk} at risk · ${totals.off_track} off track${totals.not_reported > 0 ? ` · ${totals.not_reported} pending` : ""}`}
           icon={<AlertTriangle size={16} />}
           tone={totals.off_track ? "bad" : totals.at_risk ? "warn" : "ok"}
         />
