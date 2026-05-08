@@ -104,12 +104,16 @@ type KpiSpec = KPI & {
 
 const kpiSpecs: KpiSpec[] = [
   // ── CEO — Jose Lepage ──────────────────────────────────────────────────
-  k("co_revenue", "Total Revenue", "Shopify + Amazon + Other Channels (MTD).", "currency", "higher_is_better", "shopify", "company.total_revenue", "mtd",
+  k("ceo_revenue", "Company Revenue", "Total revenue across all channels (Shopify + Amazon + Others).", "currency", "higher_is_better", "shopify", "company.revenue", "mtd",
     1500000, "tm_jose", "dep_exec", [], 0, 0, 0),
-  k("co_ltv_cac", "LTV : CAC", "Lifetime value divided by blended CAC.", "ratio", "higher_is_better", "manual", "company.ltv_to_cac", "mtd",
-    3.0, "tm_jose", "dep_exec", [], 0, 0, 0),
-  k("co_repeat", "Repeat Purchase Rate", "% of customers who buy more than once.", "percent", "higher_is_better", "shopify", "company.repeat_purchase_rate", "mtd",
+  k("ceo_ebitda", "EBITDA Margin", "EBITDA ÷ Revenue.", "percent", "higher_is_better", "gsheets", "company.ebitda_margin", "mtd",
+    10, "tm_jose", "dep_exec", [], 0, 0, 0),
+  k("ceo_net_margin", "Net Profit Margin", "Net profit ÷ Revenue.", "percent", "higher_is_better", "gsheets", "company.net_margin", "mtd",
     15, "tm_jose", "dep_exec", [], 0, 0, 0),
+  k("ceo_blended_roas", "Blended ROAS", "Total revenue ÷ total ad spend across all platforms.", "ratio", "higher_is_better", "triplewhale", "company.blended_roas", "mtd",
+    2.28, "tm_jose", "dep_exec", [], 0, 0, 0),
+  k("ceo_kpis_on_track", "% KPIs On Track", "Company-wide percentage of KPIs at or above target.", "percent", "higher_is_better", "manual", "company.kpis_on_track", "mtd",
+    80, "tm_jose", "dep_exec", [], 0, 0, 0),
 
   // ── HEAD OF ADVERTISING — Damian ──────────────────────────────────────
   k("blended_roas", "Blended ROAS", "Total revenue ÷ total ad spend across all platforms.", "ratio", "higher_is_better", "triplewhale", "blended.roas", "mtd",
