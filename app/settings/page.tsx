@@ -44,6 +44,7 @@ const unitOptions: { value: Unit; label: string }[] = [
 export default function SettingsPage() {
   const { state, ready } = useStore();
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<"people" | "library" | "pins">("people");
   if (!ready) return null;
 
   const filtered = query
@@ -56,39 +57,245 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <div className="bracket">07 — Settings</div>
+      <div className="bracket">06 — Settings</div>
       <h1 className="section-title mt-1">Settings</h1>
       <p className="mt-2 text-sm text-white/50">
-        Click on any team member to expand and edit their KPIs. For each KPI
-        you set: <b className="text-white">Name · Target · Source</b>. Press{" "}
-        <b className="text-white">Save changes</b> when done.
+        Manage KPIs per person, edit targets in bulk, and set PINs for self-service login.
       </p>
 
-      <div className="mt-6 card flex items-end gap-3 p-4">
-        <div className="flex-1 max-w-sm">
-          <label className="label">Find a person</label>
-          <div className="relative">
-            <Search
-              size={13}
-              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-white/40"
-            />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g. Simona"
-              className="input pl-7 py-1.5 text-xs"
-            />
-          </div>
-        </div>
-        <div className="font-heading text-[11px] uppercase tracking-brand text-white/50">
-          {filtered.length} people
-        </div>
+      {/* Tabs */}
+      <div className="mt-6 inline-flex border border-white/10 bg-jet-900 p-0.5">
+        {([
+          { key: "people", label: "Per Person" },
+          { key: "library", label: "KPI Library" },
+          { key: "pins", label: "PINs" },
+        ] as const).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={cx(
+              "px-3 py-1.5 font-heading text-[11px] font-semibold uppercase tracking-brand transition",
+              tab === t.key
+                ? "bg-carbinox text-jet-950"
+                : "text-white/60 hover:text-white",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div className="mt-6 space-y-2">
-        {filtered.map((person) => (
-          <PersonRow key={person.id} personId={person.id} />
-        ))}
+      {tab === "people" && (
+        <>
+          <div className="mt-4 card flex items-end gap-3 p-4">
+            <div className="flex-1 max-w-sm">
+              <label className="label">Find a person</label>
+              <div className="relative">
+                <Search size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-white/40" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g. Simona"
+                  className="input pl-7 py-1.5 text-xs"
+                />
+              </div>
+            </div>
+            <div className="font-heading text-[11px] uppercase tracking-brand text-white/50">
+              {filtered.length} people
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {filtered.map((person) => (
+              <PersonRow key={person.id} personId={person.id} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {tab === "library" && <KpiLibrary />}
+      {tab === "pins" && <PinManager />}
+    </div>
+  );
+}
+
+/** Bulk KPI library — group by KPI name, set the target for everyone with that KPI in one click. */
+function KpiLibrary() {
+  const { state, upsertTarget } = useStore();
+  const [drafts, setDrafts] = useState<Record<string, number>>({});
+  const [flash, setFlash] = useState<string | null>(null);
+
+  // Group targets by KPI name (so "Meta ROAS" rolls Simona + Kristaps into one row)
+  const groups = useMemo(() => {
+    const map = new Map<string, { name: string; unit: Unit; targets: Target[]; targetValue: number; owners: string[] }>();
+    for (const t of state.targets) {
+      const kpi = state.kpis.find((k) => k.id === t.kpiId);
+      if (!kpi) continue;
+      const owner = state.team.find((m) => m.id === t.ownerId);
+      const group = map.get(kpi.name);
+      if (group) {
+        group.targets.push(t);
+        if (owner) group.owners.push(owner.name);
+      } else {
+        map.set(kpi.name, {
+          name: kpi.name,
+          unit: kpi.unit,
+          targets: [t],
+          targetValue: t.target,
+          owners: owner ? [owner.name] : [],
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [state.kpis, state.targets, state.team]);
+
+  function applyAll(name: string, value: number) {
+    const group = groups.find((g) => g.name === name);
+    if (!group) return;
+    for (const t of group.targets) {
+      upsertTarget({ ...t, target: value });
+    }
+    setFlash(name);
+    setTimeout(() => setFlash(null), 1500);
+    setDrafts((d) => {
+      const next = { ...d };
+      delete next[name];
+      return next;
+    });
+  }
+
+  return (
+    <div className="mt-4">
+      <p className="text-sm text-white/55">
+        Each row groups every team member that owns this KPI. Set a new target
+        and click <b className="text-white">Apply to all</b> — it updates everyone in one click.
+      </p>
+      <div className="mt-4 overflow-x-auto border border-white/10">
+        <table className="w-full text-sm">
+          <thead className="bg-white/[0.02] text-left text-[11px] uppercase tracking-wider text-white/50">
+            <tr>
+              <th className="px-3 py-2">KPI</th>
+              <th className="px-3 py-2">Owners</th>
+              <th className="px-3 py-2 text-right">Current target</th>
+              <th className="px-3 py-2 text-right">New target</th>
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {groups.map((g) => {
+              const allSame = g.targets.every((t) => t.target === g.targets[0].target);
+              const draft = drafts[g.name];
+              const dirty = draft !== undefined && draft !== g.targetValue;
+              return (
+                <tr key={g.name} className="hover:bg-white/[0.02]">
+                  <td className="px-3 py-2.5">
+                    <div className="font-medium text-white">{g.name}</div>
+                    <div className="text-[11px] text-white/40">{g.targets.length} owner{g.targets.length === 1 ? "" : "s"}</div>
+                  </td>
+                  <td className="px-3 py-2.5 text-[11px] text-white/60">
+                    {g.owners.slice(0, 3).join(", ")}
+                    {g.owners.length > 3 && ` +${g.owners.length - 3} more`}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-numeric text-white">
+                    {allSame
+                      ? g.targets[0].target
+                      : `Mixed (${Math.min(...g.targets.map((t) => t.target))}–${Math.max(...g.targets.map((t) => t.target))})`}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    <input
+                      type="number"
+                      step="any"
+                      value={draft ?? g.targetValue}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [g.name]: Number(e.target.value) }))}
+                      className="input w-24 text-right font-numeric text-[12px]"
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <button
+                      disabled={!dirty}
+                      onClick={() => applyAll(g.name, draft!)}
+                      className="btn-primary py-1 disabled:opacity-40"
+                    >
+                      {flash === g.name ? "Saved" : "Apply to all"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** PIN manager — set/clear a PIN per team member to gate /fill access. */
+function PinManager() {
+  const { state, upsertTeamMember } = useStore();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  function setPin(memberId: string, pin: string) {
+    const member = state.team.find((m) => m.id === memberId);
+    if (!member) return;
+    upsertTeamMember({ ...member, pin: pin || undefined });
+    setDrafts((d) => {
+      const next = { ...d };
+      delete next[memberId];
+      return next;
+    });
+  }
+
+  return (
+    <div className="mt-4">
+      <p className="text-sm text-white/55">
+        Set a 4-6 digit PIN for each team member. They'll be prompted for it when
+        they pick their name on the <b className="text-carbinox">Fill KPIs Here</b> page.
+        Leave blank to allow open access.
+      </p>
+      <div className="mt-4 space-y-1.5">
+        {state.team.map((m) => {
+          const dept = state.departments.find((d) => d.id === m.departmentId);
+          const draft = drafts[m.id];
+          const current = m.pin || "";
+          const dirty = draft !== undefined && draft !== current;
+          return (
+            <div key={m.id} className="card flex items-center gap-3 p-3">
+              <Avatar name={m.name} size={32} color={dept?.color} avatarUrl={m.avatarUrl} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
+                  {m.name}
+                </div>
+                <div className="truncate text-[11px] text-white/45">{m.position}</div>
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                placeholder={current ? "•••" : "Set PIN"}
+                value={draft ?? ""}
+                onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: e.target.value }))}
+                className="input w-32 text-center font-numeric tracking-widest"
+              />
+              <button
+                onClick={() => setPin(m.id, draft ?? "")}
+                disabled={!dirty}
+                className="btn-primary py-1 disabled:opacity-40"
+              >
+                Save
+              </button>
+              {current && (
+                <button
+                  onClick={() => upsertTeamMember({ ...m, pin: undefined })}
+                  className="btn-ghost py-1"
+                  title="Clear PIN"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -118,3 +118,14 @@ export function todayValue(progress: Progress | undefined): number {
   if (!progress?.samples?.length) return progress?.today ?? 0;
   return progress.samples[progress.samples.length - 1].value;
 }
+
+export function currentPeriodKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function shiftPeriod(periodKey: string, delta: number): string {
+  const [y, m] = periodKey.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}

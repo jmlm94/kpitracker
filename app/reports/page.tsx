@@ -13,9 +13,12 @@ import {
   statusLabel,
 } from "@/lib/format";
 import {
+  Bell,
+  CalendarClock,
   CheckCircle2,
   CircleAlert,
   Clock,
+  Download,
   Filter,
 } from "lucide-react";
 
@@ -80,6 +83,60 @@ export default function ReportsPage() {
   );
   const submittedCount = expected.filter((m) => submitted.has(m.id)).length;
 
+  // Deadline = 5th of the month after the reporting period
+  const [py, pm] = periodKey.split("-").map(Number);
+  const deadlineDate = new Date(py, pm, 5); // (pm) is 0-indexed for next month
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysToDeadline = Math.ceil((deadlineDate.getTime() - today.getTime()) / 86400000);
+  const isPastDeadline = today > deadlineDate;
+
+  function copyReminder(memberName: string) {
+    const url = typeof window !== "undefined" ? window.location.origin + "/fill" : "";
+    const text = `Hi ${memberName.split(" ")[0]} — quick reminder to submit your KPIs for ${periodLabel(periodKey)}. Deadline: ${deadlineDate.toLocaleDateString()}.${url ? `\nFill them out here: ${url}` : ""}`;
+    navigator.clipboard.writeText(text).then(() => {
+      alert(`Reminder for ${memberName} copied to clipboard. Paste into Slack/email.`);
+    });
+  }
+
+  function exportCSV() {
+    const rows: string[][] = [];
+    rows.push(["Person", "Department", "Position", "KPI", "Target", "Reported", "Status", "Notes"]);
+    const submissionsForPeriod = submissions.filter((s) => s.periodKey === periodKey);
+    for (const sub of submissionsForPeriod) {
+      const owner = state.team.find((m) => m.id === sub.ownerId);
+      const dept = state.departments.find((d) => d.id === owner?.departmentId);
+      const ownedTargets = state.targets.filter((t) => t.ownerId === sub.ownerId);
+      for (const t of ownedTargets) {
+        const kpi = state.kpis.find((k) => k.id === t.kpiId);
+        if (!kpi) continue;
+        const reported = sub.values[t.id];
+        const ratio = reported !== undefined ? progressRatio(kpi, t, reported) : 0;
+        const status = reported ? statusLabel(classifyStatus(ratio)) : "Not reported";
+        rows.push([
+          owner?.name || "",
+          dept?.name || "",
+          owner?.position || "",
+          kpi.name,
+          String(t.target),
+          reported !== undefined ? String(reported) : "",
+          status,
+          sub.notes || "",
+        ]);
+      }
+    }
+    const csv = rows
+      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `carbinox-kpis-${periodKey}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div>
       <div className="bracket">07 — Monthly Reports</div>
@@ -88,6 +145,35 @@ export default function ReportsPage() {
         Self-reported monthly numbers from each team member. Switch months to
         scroll back through history. Use this in 1:1s.
       </p>
+
+      {/* Deadline banner */}
+      <div
+        className={cx(
+          "mt-4 card flex flex-wrap items-center gap-3 p-3",
+          isPastDeadline ? "border-bad/40 bg-bad/5" : daysToDeadline <= 3 ? "border-warn/40 bg-warn/5" : "border-white/10",
+        )}
+      >
+        <CalendarClock
+          size={16}
+          className={isPastDeadline ? "text-bad" : daysToDeadline <= 3 ? "text-warn" : "text-carbinox"}
+        />
+        <div className="flex-1 text-[12px]">
+          <span className="font-heading font-semibold uppercase tracking-brand text-white">
+            Deadline · {periodLabel(periodKey)} reports
+          </span>
+          <span className="ml-2 text-white/55">
+            {deadlineDate.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}{" "}
+            {isPastDeadline
+              ? `· ${Math.abs(daysToDeadline)} day${Math.abs(daysToDeadline) === 1 ? "" : "s"} overdue`
+              : daysToDeadline === 0
+                ? "· due today"
+                : `· ${daysToDeadline} day${daysToDeadline === 1 ? "" : "s"} remaining`}
+          </span>
+        </div>
+        <button onClick={exportCSV} className="btn-ghost py-1">
+          <Download size={13} /> Export CSV
+        </button>
+      </div>
 
       {/* Period + filter bar */}
       <div className="card mt-6 flex flex-wrap items-end gap-3 p-4">
@@ -152,31 +238,44 @@ export default function ReportsPage() {
             );
             const dept = state.departments.find((d) => d.id === m.departmentId);
             return (
-              <Link
+              <div
                 key={m.id}
-                href={`/team/${m.id}`}
                 className={cx(
-                  "card flex items-center gap-3 p-3 transition hover:border-white/20",
+                  "card flex items-center gap-3 p-3",
                   sub ? "" : "border-warn/30",
                 )}
               >
-                <Avatar name={m.name} color={dept?.color} size={32} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
-                    {m.name}
+                <Link href={`/team/${m.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                  <Avatar name={m.name} color={dept?.color} size={32} avatarUrl={m.avatarUrl} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
+                      {m.name}
+                    </div>
+                    <div className="truncate text-[11px] text-white/50">{dept?.name}</div>
                   </div>
-                  <div className="truncate text-[11px] text-white/50">{dept?.name}</div>
-                </div>
+                </Link>
                 {sub ? (
                   <span className="chip border-ok/60 bg-ok/10 text-ok">
                     <CheckCircle2 size={10} /> Submitted
                   </span>
                 ) : (
-                  <span className="chip border-warn/60 bg-warn/10 text-warn">
-                    <Clock size={10} /> Pending
-                  </span>
+                  <>
+                    <span className="chip border-warn/60 bg-warn/10 text-warn">
+                      <Clock size={10} /> Pending
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        copyReminder(m.name);
+                      }}
+                      className="text-white/40 hover:text-carbinox"
+                      title="Copy reminder text to clipboard"
+                    >
+                      <Bell size={13} />
+                    </button>
+                  </>
                 )}
-              </Link>
+              </div>
             );
           })}
         </div>

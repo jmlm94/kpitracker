@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
+import { useStore } from "@/lib/store";
 import type { KPI, Progress, Target, TeamMember } from "@/lib/types";
 import {
   classifyStatus,
@@ -17,6 +18,8 @@ import {
 import {
   TIMEFRAMES,
   aggregate,
+  currentPeriodKey,
+  shiftPeriod,
   todayValue as tfToday,
   type Timeframe,
 } from "@/lib/timeframe";
@@ -56,6 +59,19 @@ export function KPICard({
     kpi.direction === "higher_is_better"
       ? todayValue >= actual
       : todayValue <= actual;
+
+  // Month-over-month delta from previous period's submission
+  const { state } = useStore();
+  const priorPeriodKey = shiftPeriod(currentPeriodKey(), -1);
+  const priorSubmission = (state.submissions || []).find(
+    (s) => s.ownerId === target.ownerId && s.periodKey === priorPeriodKey,
+  );
+  const priorValue = priorSubmission?.values[target.id];
+  const hasMoM = priorValue !== undefined && priorValue !== 0 && actual !== 0;
+  const momDelta = hasMoM ? actual - priorValue! : 0;
+  const momPct = hasMoM && priorValue! !== 0 ? (momDelta / priorValue!) * 100 : 0;
+  const momImproved =
+    kpi.direction === "higher_is_better" ? momDelta > 0 : momDelta < 0;
 
   const accent = deptColor || "#f8c808";
   const windowLabel = timeframe
@@ -168,12 +184,29 @@ export function KPICard({
           <span className="text-xs text-white/40">Unassigned</span>
         )}
         <div className="flex items-center gap-1 font-numeric text-[10px] uppercase tracking-brand text-white/55">
-          {todayBetter ? (
-            <TrendingUp size={12} className="text-ok" />
+          {hasMoM ? (
+            <>
+              {momImproved ? (
+                <TrendingUp size={12} className="text-ok" />
+              ) : (
+                <TrendingDown size={12} className="text-bad" />
+              )}
+              <span className={cx(momImproved ? "text-ok" : "text-bad")}>
+                {momDelta > 0 ? "+" : ""}
+                {momPct.toFixed(0)}%
+              </span>
+              <span className="text-white/40">vs last mo</span>
+            </>
           ) : (
-            <TrendingDown size={12} className="text-bad" />
+            <>
+              {todayBetter ? (
+                <TrendingUp size={12} className="text-ok" />
+              ) : (
+                <TrendingDown size={12} className="text-bad" />
+              )}
+              Today {formatValue(todayValue, kpi.unit)}
+            </>
           )}
-          Today {formatValue(todayValue, kpi.unit)}
         </div>
       </div>
     </div>

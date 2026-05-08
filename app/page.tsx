@@ -1,32 +1,49 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { KPICard } from "@/components/KPICard";
 import { DepartmentCard } from "@/components/DepartmentCard";
 import { TimeframeSelector } from "@/components/TimeframeSelector";
 import {
   classifyStatus,
+  formatValue,
+  pickProgressValue,
   progressRatio,
+  statusBg,
+  statusLabel,
 } from "@/lib/format";
 import { aggregate, useTimeframe } from "@/lib/timeframe";
-import { AlertTriangle, Flame, Target as TargetIcon, Trophy } from "lucide-react";
+import { AlertTriangle, Flame, MessageSquare, Search, Target as TargetIcon, Trophy } from "lucide-react";
 
 export default function DashboardPage() {
   const { state, ready } = useStore();
   const [timeframe, setTimeframe] = useTimeframe();
+  const [search, setSearch] = useState("");
   if (!ready) return null;
 
-  const rows = state.targets
+  const allRows = state.targets
     .map((t) => {
       const kpi = state.kpis.find((k) => k.id === t.kpiId);
       const p = state.progress[t.id];
       if (!kpi || !p) return null;
+      const owner = state.team.find((m) => m.id === t.ownerId);
       const actual = aggregate(kpi, p, timeframe);
       const ratio = progressRatio(kpi, t, actual);
-      return { target: t, kpi, progress: p, actual, ratio };
+      return { target: t, kpi, progress: p, actual, ratio, owner };
     })
     .filter((x): x is NonNullable<typeof x> => !!x);
+
+  const q = search.trim().toLowerCase();
+  const rows = q
+    ? allRows.filter(
+        (r) =>
+          r.kpi.name.toLowerCase().includes(q) ||
+          r.owner?.name.toLowerCase().includes(q) ||
+          r.kpi.metricKey.toLowerCase().includes(q),
+      )
+    : allRows;
 
   const totals = rows.reduce(
     (acc, r) => {
@@ -44,22 +61,88 @@ export default function DashboardPage() {
   const overallPct = totals.count ? totals.sum / totals.count : 0;
 
   // Top N risks (sorted ascending by ratio — the most behind first)
-  const risks = [...rows].sort((a, b) => a.ratio - b.ratio).slice(0, 6);
+  const risks = [...rows]
+    .filter((r) => r.actual !== 0)
+    .sort((a, b) => a.ratio - b.ratio)
+    .slice(0, 6);
   // Winning KPIs (ahead of target, best first)
   const winning = rows
-    .filter((r) => classifyStatus(r.ratio) === "ahead" || classifyStatus(r.ratio) === "on_track")
+    .filter((r) => r.actual !== 0 && (classifyStatus(r.ratio) === "ahead" || classifyStatus(r.ratio) === "on_track"))
     .sort((a, b) => b.ratio - a.ratio)
     .slice(0, 6);
 
+  // Company Scorecard — pull Jose's CEO KPIs
+  const ceoKpiIds = ["kpi_ceo_revenue", "kpi_ceo_blended_roas", "kpi_ceo_net_margin", "kpi_ceo_ebitda", "kpi_ceo_kpis_on_track"];
+  const scorecard = ceoKpiIds
+    .map((id) => {
+      const kpi = state.kpis.find((k) => k.id === id);
+      const target = state.targets.find((t) => t.kpiId === id);
+      if (!kpi || !target) return null;
+      // For "% KPIs On Track" — compute from actual data instead of progress
+      if (id === "kpi_ceo_kpis_on_track") {
+        const onTrack = totals.ahead + totals.on_track;
+        const pct = totals.count ? (onTrack / totals.count) * 100 : 0;
+        return { kpi, target, actual: pct };
+      }
+      const p = state.progress[target.id];
+      const actual = p ? pickProgressValue(kpi, p) : 0;
+      return { kpi, target, actual };
+    })
+    .filter((x): x is NonNullable<typeof x> => !!x);
+
+  // Recent notes for the Dashboard widget
+  const recentNotes = (state.submissions || [])
+    .filter((s) => !!s.notes?.trim())
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
+    .slice(0, 5);
+
   return (
     <div>
-      {/* Timeframe bar */}
+      {/* Company Scorecard */}
+      {scorecard.length > 0 && (
+        <section className="mb-6">
+          <div className="bracket text-carbinox">Company Scorecard</div>
+          <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
+            {scorecard.map(({ kpi, target, actual }) => {
+              const ratio = progressRatio(kpi, target, actual);
+              const status = classifyStatus(ratio);
+              return (
+                <div key={kpi.id} className="card relative p-3">
+                  <div className="bracket text-[9px]">{kpi.name}</div>
+                  <div className="mt-1 font-numeric text-xl font-bold text-white">
+                    {actual === 0 ? "—" : formatValue(actual, kpi.unit)}
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-white/45">
+                    Target {formatValue(target.target, kpi.unit)}
+                  </div>
+                  <span className={`chip absolute right-2 top-2 ${statusBg(status)} px-1 py-0 text-[8px]`}>
+                    {actual === 0 ? "—" : statusLabel(status)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Timeframe + search bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="bracket">Viewing</div>
-          <p className="mt-1 text-sm text-white/60">
-            All KPI values below are aggregated over the selected timeframe.
-          </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <div className="bracket">Viewing</div>
+            <p className="mt-1 text-sm text-white/60">
+              All KPI values below are aggregated over the selected timeframe.
+            </p>
+          </div>
+          <div className="relative">
+            <Search size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-white/40" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search KPI or owner…"
+              className="input pl-7 py-1.5 text-xs w-56"
+            />
+          </div>
         </div>
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
@@ -180,6 +263,52 @@ export default function DashboardPage() {
                   deptColor={dept?.color}
                   timeframe={timeframe}
                 />
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Recent Notes */}
+      {recentNotes.length > 0 && (
+        <section className="mt-10">
+          <div className="bracket">Latest Notes from the Team</div>
+          <h2 className="section-title mt-1">What's on people's minds</h2>
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            {recentNotes.map((sub) => {
+              const owner = state.team.find((m) => m.id === sub.ownerId);
+              const dept = state.departments.find((d) => d.id === owner?.departmentId);
+              const [y, m] = sub.periodKey.split("-").map(Number);
+              const period = new Date(y, m - 1).toLocaleString(undefined, { month: "short", year: "numeric" });
+              return (
+                <Link
+                  key={sub.id}
+                  href={`/team/${owner?.id}`}
+                  className="card flex items-start gap-3 p-4 transition hover:border-white/20"
+                >
+                  <div className="mt-0.5 bg-carbinox/15 p-2 text-carbinox">
+                    <MessageSquare size={14} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-heading text-[12px] font-semibold uppercase tracking-brand text-white">
+                        {owner?.name || "Unknown"}
+                      </span>
+                      <span className="font-numeric text-[10px] text-white/40">· {period}</span>
+                      {dept && (
+                        <span
+                          className="font-numeric text-[10px] text-white/55"
+                          style={{ color: dept.color }}
+                        >
+                          {dept.name}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 line-clamp-3 text-[13px] text-white/75">
+                      {sub.notes}
+                    </p>
+                  </div>
+                </Link>
               );
             })}
           </div>
