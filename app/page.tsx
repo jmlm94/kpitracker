@@ -71,19 +71,13 @@ export default function DashboardPage() {
     .sort((a, b) => b.ratio - a.ratio)
     .slice(0, 6);
 
-  // Company Scorecard — pull Jose's CEO KPIs
-  const ceoKpiIds = ["kpi_ceo_revenue", "kpi_ceo_blended_roas", "kpi_ceo_net_margin", "kpi_ceo_ebitda", "kpi_ceo_kpis_on_track"];
+  // Company Scorecard — Jose's CEO KPIs
+  const ceoKpiIds = ["kpi_co_revenue", "kpi_co_ltv_cac", "kpi_co_repeat"];
   const scorecard = ceoKpiIds
     .map((id) => {
       const kpi = state.kpis.find((k) => k.id === id);
       const target = state.targets.find((t) => t.kpiId === id);
       if (!kpi || !target) return null;
-      // For "% KPIs On Track" — compute from actual data instead of progress
-      if (id === "kpi_ceo_kpis_on_track") {
-        const onTrack = totals.ahead + totals.on_track;
-        const pct = totals.count ? (onTrack / totals.count) * 100 : 0;
-        return { kpi, target, actual: pct };
-      }
       const p = state.progress[target.id];
       const actual = p ? pickProgressValue(kpi, p) : 0;
       return { kpi, target, actual };
@@ -102,7 +96,7 @@ export default function DashboardPage() {
       {scorecard.length > 0 && (
         <section className="mb-6">
           <div className="bracket text-carbinox">Company Scorecard</div>
-          <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
+          <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
             {scorecard.map(({ kpi, target, actual }) => {
               const ratio = progressRatio(kpi, target, actual);
               const status = classifyStatus(ratio);

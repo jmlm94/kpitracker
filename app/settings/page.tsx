@@ -115,7 +115,51 @@ export default function SettingsPage() {
 
       {tab === "library" && <KpiLibrary />}
       {tab === "pins" && <PinManager />}
+
+      {/* Danger zone — wipe local state */}
+      <DangerZone />
     </div>
+  );
+}
+
+function DangerZone() {
+  const { reset } = useStore();
+  function confirmReset() {
+    const ok = confirm(
+      "Reset to defaults?\n\nThis wipes ALL data in your browser:\n• Every KPI value you've entered\n• Every monthly submission\n• Profile picture uploads\n• PINs you've set\n• Department/team customizations made via the UI\n\nThe seed (people, departments, KPIs, targets) reloads fresh with all values at zero.\n\nThis only affects YOUR browser — other team members on other devices keep their data.\n\nProceed?",
+    );
+    if (!ok) return;
+    try {
+      // Clear the main store
+      window.localStorage.removeItem("carbinox-kpi-tracker:v1");
+      // Clear any active member + drafts
+      window.localStorage.removeItem("carbinox-kpi-tracker:active_member");
+      Object.keys(window.localStorage).forEach((k) => {
+        if (k.startsWith("carbinox-kpi-draft:")) {
+          window.localStorage.removeItem(k);
+        }
+      });
+    } catch {}
+    reset();
+    window.location.reload();
+  }
+
+  return (
+    <section className="mt-12 card border-bad/30 bg-bad/5 p-5">
+      <div className="bracket text-bad">Danger Zone</div>
+      <h2 className="mt-1 font-display text-xl font-extrabold uppercase tracking-brand text-white">
+        Reset to defaults
+      </h2>
+      <p className="mt-2 text-sm text-white/60">
+        Wipes your browser's stored state and reloads the latest seed (people,
+        departments, KPIs from the spec — all values at zero). Use this if you
+        want to start fresh, or if old data is showing up that you no longer
+        want.
+      </p>
+      <button onClick={confirmReset} className="btn-danger mt-4">
+        Reset to defaults
+      </button>
+    </section>
   );
 }
 
